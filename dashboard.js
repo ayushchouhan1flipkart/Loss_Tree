@@ -21,9 +21,10 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
+// FIX: Renamed 'ASP_Drop' to 'ASP Drop' and 'Network_Change' to 'Network Issue' to strictly match your raw data headers
 const LOSS_REMARK_SEQ = {
   "Instock": 0, "NPD": 1, "NO-PO|NO-QOH| NO-IRN": 2, 
-  "Not Received 30D(sch)": 3, "Not Received 30D": 4, "ASP_Drop": 5, "Network_Change": 6, "Wrong Forecasting": 7, 
+  "Not Received 30D(sch)": 3, "Not Received 30D": 4, "ASP Drop": 5, "Network Issue": 6, "Wrong Forecasting": 7, 
   "ATP-QOH Delta": 8, "No PO": 9, "PO Error": 10, "Not Enough PO Raised": 11,
   "Bad Fill Rate": 12, "Scheduled": 13, "Not Scheduled": 14, 
   "IWIT Pendency": 15, "SH-SH IWIT Issue": 16, "Other Loss": 17
@@ -41,7 +42,6 @@ $(document).on('click', 'tr.group-header', function() {
     }
 });
 
-// FIX: Added 'overflow: auto' and 'border-right' to make the native CSS resize handle visible
 function renderGroupCol(d, type, row) {
     if (type !== 'display') return d;
     let content = d;
@@ -85,7 +85,6 @@ $(document).ready(function() {
   });
 });
 
-// FIX: Added limit check
 function applyDayChunks() {
   let selectedChunks = [];
   $('.chunk-checkbox:checked').each(function() {
@@ -139,7 +138,6 @@ function downloadCSVsFromDrive(config) {
       let data2 = [];
       let baseHeaders = [];
       
-      // FIX: Smart Header Mapper prevents >100% bug on old shifted files
       data2Array.forEach((chunkData, index) => {
         if (chunkData && chunkData.length > 0) {
           if (index === 0) {
@@ -286,10 +284,11 @@ function togglePage() {
   else if ($('#btn-p3').is(':checked')) currentPage = 'p3';
   else currentPage = 'hub';
 
+  // FIX: Make Day Selector ONLY visible on P2 and P3
   if (currentPage === 'p2' || currentPage === 'p3') {
-    $('#day-range-toggles').removeClass('d-none');
+    $('#dod-controls-container').removeClass('d-none');
   } else {
-    $('#day-range-toggles').addClass('d-none');
+    $('#dod-controls-container').addClass('d-none');
   }
 
   if (currentPage === 'hub') {
@@ -380,6 +379,7 @@ function aggregateAllDataInMemory() {
     if (filterSets.organic.size > 0 && idxOrg1 !== undefined && !filterSets.organic.has(String(row[idxOrg1]).trim())) return false;
     if (filterSets.em.size > 0 && idxEm1 !== undefined && !filterSets.em.has(String(row[idxEm1]).trim())) return false;
     if (filterSets.ubpl.size > 0 && idxUbpl1 !== undefined && !filterSets.ubpl.has(String(row[idxUbpl1]).trim())) return false;
+    
     if (filterSets.bu.size > 0 && idxBU1 !== undefined && !filterSets.bu.has(String(row[idxBU1]).trim())) return false;
     if (filterSets.company.size > 0 && idxComp1 !== undefined && !filterSets.company.has(String(row[idxComp1]).trim())) return false;
     if (filterSets.kam.size > 0 && idxKam1 !== undefined && !filterSets.kam.has(String(row[idxKam1]).trim())) return false;
@@ -425,6 +425,7 @@ function aggregateAllDataInMemory() {
     if (filterSets.organic.size > 0 && idxOrg2 !== undefined && !filterSets.organic.has(String(row[idxOrg2]).trim())) return false;
     if (filterSets.em.size > 0 && idxEm2 !== undefined && !filterSets.em.has(String(row[idxEm2]).trim())) return false;
     if (filterSets.ubpl.size > 0 && idxUbpl2 !== undefined && !filterSets.ubpl.has(String(row[idxUbpl2]).trim())) return false;
+
     if (filterSets.bu.size > 0 && idxBU2 !== undefined && !filterSets.bu.has(String(row[idxBU2]).trim())) return false;
     if (filterSets.company.size > 0 && idxComp2 !== undefined && !filterSets.company.has(String(row[idxComp2]).trim())) return false;
     if (filterSets.kam.size > 0 && idxKam2 !== undefined && !filterSets.kam.has(String(row[idxKam2]).trim())) return false;
@@ -1186,6 +1187,7 @@ function populateFilterOptions() {
   let idxGourmet1 = colIdxP1['gourmet_flag'] !== undefined ? colIdxP1['gourmet_flag'] : colIdxP1['Gourmet_Flag'];
   let idxRegional1 = colIdxP1['regional_fsn_flag'] !== undefined ? colIdxP1['regional_fsn_flag'] : colIdxP1['Regional_fsn_flag'];
   let idxSuper1 = colIdxP1['Super_Category'] !== undefined ? colIdxP1['Super_Category'] : (colIdxP1['super_category'] || colIdxP1['Supercategory'] || colIdxP1['supercategory']);
+  
   let idxOrg1 = colIdxP1['Organic_Flag'] || colIdxP1['organic_flag'];
   let idxEm1 = colIdxP1['Engagement_Manager'] || colIdxP1['engagement_manager'];
   let idxUbpl1 = colIdxP1['UB_PL_Flag'] || colIdxP1['ub_pl_flag'];
