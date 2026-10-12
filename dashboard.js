@@ -85,6 +85,7 @@ $(document).ready(function() {
   });
 });
 
+// FIX: Added limit check
 function applyDayChunks() {
   let selectedChunks = [];
   $('.chunk-checkbox:checked').each(function() {
@@ -95,6 +96,9 @@ function applyDayChunks() {
       alert("Please select at least one day range.");
       $('#btn-chunk-0').prop('checked', true);
       selectedChunks = [0];
+  } else if (selectedChunks.length > 3) {
+      alert("Please select a maximum of 3 tabs at a time to prevent browser crashes.");
+      return; 
   }
 
   $('#loader-text').text("Fetching Selected Days...");
@@ -133,14 +137,21 @@ function downloadCSVsFromDrive(config) {
       $('#loader-text').text("Building Dashboard...");
 
       let data2 = [];
-      let isFirst = true;
-      data2Array.forEach(chunkData => {
+      let baseHeaders = [];
+      
+      // FIX: Smart Header Mapper prevents >100% bug on old shifted files
+      data2Array.forEach((chunkData, index) => {
         if (chunkData && chunkData.length > 0) {
-          if (isFirst) {
+          if (index === 0) {
+            baseHeaders = chunkData[0].map(h => String(h).trim().toLowerCase());
             data2 = data2.concat(chunkData); 
-            isFirst = false;
           } else {
-            let chunkWithoutHeader = chunkData.slice(1); 
+            let chunkHeaders = chunkData[0].map(h => String(h).trim().toLowerCase());
+            let indexMap = baseHeaders.map(bh => chunkHeaders.indexOf(bh));
+            
+            let chunkWithoutHeader = chunkData.slice(1).map(row => {
+               return indexMap.map(idx => idx > -1 ? row[idx] : "");
+            });
             data2 = data2.concat(chunkWithoutHeader);
           }
         }
@@ -275,7 +286,6 @@ function togglePage() {
   else if ($('#btn-p3').is(':checked')) currentPage = 'p3';
   else currentPage = 'hub';
 
-  // FIX: Toggles visibility of the DOD Buttons only when needed
   if (currentPage === 'p2' || currentPage === 'p3') {
     $('#day-range-toggles').removeClass('d-none');
   } else {
