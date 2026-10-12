@@ -21,7 +21,7 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
-// FIX: Renamed 'ASP_Drop' to 'ASP Drop' and 'Network_Change' to 'Network Issue' to strictly match your raw data headers
+// STRICT NAMES MATCHING YOUR RAW DATA
 const LOSS_REMARK_SEQ = {
   "Instock": 0, "NPD": 1, "NO-PO|NO-QOH| NO-IRN": 2, 
   "Not Received 30D(sch)": 3, "Not Received 30D": 4, "ASP Drop": 5, "Network Issue": 6, "Wrong Forecasting": 7, 
@@ -42,6 +42,7 @@ $(document).on('click', 'tr.group-header', function() {
     }
 });
 
+// FSN DRAGGER CSS FIX (overflow: auto & dashed border)
 function renderGroupCol(d, type, row) {
     if (type !== 'display') return d;
     let content = d;
@@ -49,7 +50,7 @@ function renderGroupCol(d, type, row) {
     else if (row.isChild) content = `<span class="child-indent"></span>` + d;
 
     let rawText = d ? String(d).replace(/"/g, '&quot;') : '';
-    return `<div style="max-width: 350px; min-width: 150px; white-space: nowrap; overflow: auto; text-overflow: ellipsis; display: inline-block; vertical-align: middle; resize: horizontal; padding-right: 5px; border-right: 1px dashed #cbd5e1;" title="${rawText}">${content}</div>`;
+    return `<div style="max-width: 450px; min-width: 150px; white-space: nowrap; overflow: auto; text-overflow: ellipsis; display: inline-block; vertical-align: middle; resize: horizontal; padding-right: 5px; border-right: 2px dashed #cbd5e1;" title="${rawText}">${content}</div>`;
 }
 
 function applyColorCoding(td, cellData, rowData) {
@@ -138,6 +139,7 @@ function downloadCSVsFromDrive(config) {
       let data2 = [];
       let baseHeaders = [];
       
+      // SMART HEADER MAPPER: Prevents >100% bugs on historical files
       data2Array.forEach((chunkData, index) => {
         if (chunkData && chunkData.length > 0) {
           if (index === 0) {
@@ -284,11 +286,10 @@ function togglePage() {
   else if ($('#btn-p3').is(':checked')) currentPage = 'p3';
   else currentPage = 'hub';
 
-  // FIX: Make Day Selector ONLY visible on P2 and P3
   if (currentPage === 'p2' || currentPage === 'p3') {
-    $('#dod-controls-container').removeClass('d-none');
+    $('#day-range-toggles').removeClass('d-none');
   } else {
-    $('#dod-controls-container').addClass('d-none');
+    $('#day-range-toggles').addClass('d-none');
   }
 
   if (currentPage === 'hub') {
@@ -558,7 +559,7 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
               b.dsInstock += vDsIn; b.dsTotal += vDsTot; b.dsMstn += vDsMstn; b.dsMstnIt += vDsMstnIt; b.dsNorm += vDsNorm; b.instockItDs += vInstockItDs; b.dsNormRaw += vDsNorm;
           };
           addDsMetrics(byGroup[groupKey]); addDsMetrics(zoneTotals[zoneName]); addDsMetrics(byZoneTag[ztKey]);
-          addDsMetrics(shTotals[shName]); addDsMetrics(byShTag[shTagKey]); addDsMetrics(gt);
+          addDsMetrics(shTotals[shName]); addDsMetrics(byShTag[shTagKey]); addMetrics(gt);
       }
 
       if (isAllowedSH) {
@@ -1187,7 +1188,6 @@ function populateFilterOptions() {
   let idxGourmet1 = colIdxP1['gourmet_flag'] !== undefined ? colIdxP1['gourmet_flag'] : colIdxP1['Gourmet_Flag'];
   let idxRegional1 = colIdxP1['regional_fsn_flag'] !== undefined ? colIdxP1['regional_fsn_flag'] : colIdxP1['Regional_fsn_flag'];
   let idxSuper1 = colIdxP1['Super_Category'] !== undefined ? colIdxP1['Super_Category'] : (colIdxP1['super_category'] || colIdxP1['Supercategory'] || colIdxP1['supercategory']);
-  
   let idxOrg1 = colIdxP1['Organic_Flag'] || colIdxP1['organic_flag'];
   let idxEm1 = colIdxP1['Engagement_Manager'] || colIdxP1['engagement_manager'];
   let idxUbpl1 = colIdxP1['UB_PL_Flag'] || colIdxP1['ub_pl_flag'];
