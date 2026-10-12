@@ -41,6 +41,7 @@ $(document).on('click', 'tr.group-header', function() {
     }
 });
 
+// FIX: Added 'overflow: auto' and 'border-right' to make the native CSS resize handle visible
 function renderGroupCol(d, type, row) {
     if (type !== 'display') return d;
     let content = d;
@@ -48,7 +49,7 @@ function renderGroupCol(d, type, row) {
     else if (row.isChild) content = `<span class="child-indent"></span>` + d;
 
     let rawText = d ? String(d).replace(/"/g, '&quot;') : '';
-    return `<div style="max-width: 350px; min-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; resize: horizontal; padding-right: 5px;" title="${rawText}">${content}</div>`;
+    return `<div style="max-width: 350px; min-width: 150px; white-space: nowrap; overflow: auto; text-overflow: ellipsis; display: inline-block; vertical-align: middle; resize: horizontal; padding-right: 5px; border-right: 1px dashed #cbd5e1;" title="${rawText}">${content}</div>`;
 }
 
 function applyColorCoding(td, cellData, rowData) {
@@ -274,6 +275,7 @@ function togglePage() {
   else if ($('#btn-p3').is(':checked')) currentPage = 'p3';
   else currentPage = 'hub';
 
+  // FIX: Toggles visibility of the DOD Buttons only when needed
   if (currentPage === 'p2' || currentPage === 'p3') {
     $('#day-range-toggles').removeClass('d-none');
   } else {
@@ -1174,7 +1176,6 @@ function populateFilterOptions() {
   let idxGourmet1 = colIdxP1['gourmet_flag'] !== undefined ? colIdxP1['gourmet_flag'] : colIdxP1['Gourmet_Flag'];
   let idxRegional1 = colIdxP1['regional_fsn_flag'] !== undefined ? colIdxP1['regional_fsn_flag'] : colIdxP1['Regional_fsn_flag'];
   let idxSuper1 = colIdxP1['Super_Category'] !== undefined ? colIdxP1['Super_Category'] : (colIdxP1['super_category'] || colIdxP1['Supercategory'] || colIdxP1['supercategory']);
-  
   let idxOrg1 = colIdxP1['Organic_Flag'] || colIdxP1['organic_flag'];
   let idxEm1 = colIdxP1['Engagement_Manager'] || colIdxP1['engagement_manager'];
   let idxUbpl1 = colIdxP1['UB_PL_Flag'] || colIdxP1['ub_pl_flag'];
