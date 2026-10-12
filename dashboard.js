@@ -21,7 +21,7 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
-// STRICT NAMES MATCHING YOUR RAW DATA
+// EXACT UI NAMES
 const LOSS_REMARK_SEQ = {
   "Instock": 0, "NPD": 1, "NO-PO|NO-QOH| NO-IRN": 2, 
   "Not Received 30D(sch)": 3, "Not Received 30D": 4, "ASP Drop": 5, "Network Issue": 6, "Wrong Forecasting": 7, 
@@ -42,7 +42,6 @@ $(document).on('click', 'tr.group-header', function() {
     }
 });
 
-// FSN DRAGGER CSS FIX (overflow: auto & dashed border)
 function renderGroupCol(d, type, row) {
     if (type !== 'display') return d;
     let content = d;
@@ -139,14 +138,14 @@ function downloadCSVsFromDrive(config) {
       let data2 = [];
       let baseHeaders = [];
       
-      // SMART HEADER MAPPER: Prevents >100% bugs on historical files
+      // UPGRADED SMART HEADER MAPPER: Strips all spaces and underscores to force perfect matches
       data2Array.forEach((chunkData, index) => {
         if (chunkData && chunkData.length > 0) {
           if (index === 0) {
-            baseHeaders = chunkData[0].map(h => String(h).trim().toLowerCase());
+            baseHeaders = chunkData[0].map(h => String(h).trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
             data2 = data2.concat(chunkData); 
           } else {
-            let chunkHeaders = chunkData[0].map(h => String(h).trim().toLowerCase());
+            let chunkHeaders = chunkData[0].map(h => String(h).trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
             let indexMap = baseHeaders.map(bh => chunkHeaders.indexOf(bh));
             
             let chunkWithoutHeader = chunkData.slice(1).map(row => {
@@ -287,9 +286,9 @@ function togglePage() {
   else currentPage = 'hub';
 
   if (currentPage === 'p2' || currentPage === 'p3') {
-    $('#day-range-toggles').removeClass('d-none');
+    $('#dod-controls-container').removeClass('d-none');
   } else {
-    $('#day-range-toggles').addClass('d-none');
+    $('#dod-controls-container').addClass('d-none');
   }
 
   if (currentPage === 'hub') {
@@ -708,9 +707,19 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
       if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
 
-      const rawRemark = (row[rIdx] || '').toString().trim();
+      // FIX: ROBUST LOSS REMARK MAPPING
+      const rawRemark = String(row[rIdx] || '').trim().toLowerCase();
       let remark = 'Other Loss';
-      for (let k of Object.keys(LOSS_REMARK_SEQ)) { if (k.toLowerCase() === rawRemark.toLowerCase()) { remark = k; break; } }
+      
+      if (rawRemark === 'asp_drop' || rawRemark === 'asp drop') {
+          remark = 'ASP Drop';
+      } else if (rawRemark === 'network_change' || rawRemark === 'network change' || rawRemark === 'network_issue' || rawRemark === 'network issue') {
+          remark = 'Network Issue';
+      } else {
+          for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
+              if (k.toLowerCase() === rawRemark) { remark = k; break; } 
+          }
+      }
 
       const fsns = Number(row[fsnIdx]) || 0, dsInstock = Number(row[dsiIdx]) || 0, dsTotal = Number(row[dstIdx]) || 0;
       const buyNode = bnIdx !== undefined ? String(row[bnIdx] || '').trim().toLowerCase() : 'yes';
@@ -1072,9 +1081,20 @@ function exportRawCSV() {
       }
 
       if (isShLevel && zIdx !== undefined) { let zName = (row[zIdx] || 'Unassigned').toString().trim(); finalGroupKey = zName + " | " + finalGroupKey; }
-      const rawRemark = (row[colIdxP1['Loss_Remark']] || '').toString().trim();
+      
+      const rawRemark = String(row[colIdxP1['Loss_Remark']] || '').trim().toLowerCase();
       let remark = 'Other Loss';
-      for (let k of Object.keys(LOSS_REMARK_SEQ)) { if (k.toLowerCase() === rawRemark.toLowerCase()) { remark = k; break; } }
+      
+      if (rawRemark === 'asp_drop' || rawRemark === 'asp drop') {
+          remark = 'ASP Drop';
+      } else if (rawRemark === 'network_change' || rawRemark === 'network change' || rawRemark === 'network_issue' || rawRemark === 'network issue') {
+          remark = 'Network Issue';
+      } else {
+          for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
+              if (k.toLowerCase() === rawRemark) { remark = k; break; } 
+          }
+      }
+
       const fsns = Number(row[colIdxP1['FSN_Count']]) || 0, dsInstock = Number(row[colIdxP1['Instock_DS_Count']]) || 0, dsTotal = Number(row[colIdxP1['Total_DS_Count']]) || 0;
       const buyNode = buyNodeColP1 !== undefined ? (row[buyNodeColP1] || '').toString().trim().toLowerCase() : 'yes';
       
