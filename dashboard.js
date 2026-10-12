@@ -43,9 +43,12 @@ $(document).on('click', 'tr.group-header', function() {
 
 function renderGroupCol(d, type, row) {
     if (type !== 'display') return d;
-    if (row.isGroupHeader) return `<i class="bi bi-chevron-down toggle-icon"></i><span>` + d + `</span>`;
-    if (row.isChild) return `<span class="child-indent"></span>` + d;
-    return d;
+    let content = d;
+    if (row.isGroupHeader) content = `<i class="bi bi-chevron-down toggle-icon"></i><span>` + d + `</span>`;
+    else if (row.isChild) content = `<span class="child-indent"></span>` + d;
+
+    let rawText = d ? String(d).replace(/"/g, '&quot;') : '';
+    return `<div style="max-width: 350px; min-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; resize: horizontal; padding-right: 5px;" title="${rawText}">${content}</div>`;
 }
 
 function applyColorCoding(td, cellData, rowData) {
@@ -59,7 +62,6 @@ function applyColorCoding(td, cellData, rowData) {
 $(document).ready(function() {
   $('.select2').select2({ width: '100%', placeholder: 'All' });
   
-  // Fetch default chunk [0]
   google.script.run
     .withSuccessHandler(downloadCSVsFromDrive)
     .withFailureHandler(err => { alert("Config fetch failed."); clearInterval(progressTimer); $('#loader-overlay').hide(); })
@@ -82,7 +84,6 @@ $(document).ready(function() {
   });
 });
 
-// NEW: Handled Multiple Day Selections securely
 function applyDayChunks() {
   let selectedChunks = [];
   $('.chunk-checkbox:checked').each(function() {
@@ -100,7 +101,6 @@ function applyDayChunks() {
   currentProgress = 0;
   $('#loader-overlay').show();
 
-  // SECURE MEMORY FLUSH
   rawDataP1 = []; rawDataP2 = []; 
   activeFilteredP1 = []; activeFilteredP2 = [];
   GLOBAL_DATES = [];
@@ -124,7 +124,6 @@ function downloadCSVsFromDrive(config) {
       return data; 
   });
 
-  // Fetch all selected DoD Chunks concurrently
   let p2Promises = config.id2_array.map(id => fetchCSV(id, config.token));
 
   Promise.all([p1Promise, Promise.all(p2Promises)]).then(([data1, data2Array]) => { 
@@ -132,16 +131,15 @@ function downloadCSVsFromDrive(config) {
       $('#loader-percent').text('95%'); 
       $('#loader-text').text("Building Dashboard...");
 
-      // Safely merge all DoD data arrays into one large array
       let data2 = [];
       let isFirst = true;
       data2Array.forEach(chunkData => {
         if (chunkData && chunkData.length > 0) {
           if (isFirst) {
-            data2 = data2.concat(chunkData); // Keep header for the first chunk
+            data2 = data2.concat(chunkData); 
             isFirst = false;
           } else {
-            let chunkWithoutHeader = chunkData.slice(1); // Drop headers for the rest
+            let chunkWithoutHeader = chunkData.slice(1); 
             data2 = data2.concat(chunkWithoutHeader);
           }
         }
@@ -160,7 +158,6 @@ function downloadCSVsFromDrive(config) {
   });
 }
 
-// Drive safely loads single files without crashing RAM (No range chunking)
 function fetchCSV(fileId, token) {
   return new Promise((resolve, reject) => {
     Papa.parse('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
@@ -213,7 +210,6 @@ function renderHubDirectory(data) {
     pillsHtml += `<button class="hub-pill" onclick="filterHubByCohort('${c.replace(/'/g, "\\'")}')">${c}</button>`;
   });
   $('#hub-pills-container').html(pillsHtml);
-  
   displayHubGrid(masterHubData);
 }
 
@@ -271,7 +267,6 @@ function filterHub() {
   displayHubGrid(filtered);
 }
 
-// TOGGLES VISIBILITY OF DAY BUTTONS
 function togglePage() {
   if ($('#btn-p0').is(':checked')) currentPage = 'p0';
   else if ($('#btn-p1').is(':checked')) currentPage = 'p1';
@@ -279,7 +274,6 @@ function togglePage() {
   else if ($('#btn-p3').is(':checked')) currentPage = 'p3';
   else currentPage = 'hub';
 
-  // Make Day Selector ONLY visible on P2 and P3
   if (currentPage === 'p2' || currentPage === 'p3') {
     $('#day-range-toggles').removeClass('d-none');
   } else {
@@ -1180,6 +1174,7 @@ function populateFilterOptions() {
   let idxGourmet1 = colIdxP1['gourmet_flag'] !== undefined ? colIdxP1['gourmet_flag'] : colIdxP1['Gourmet_Flag'];
   let idxRegional1 = colIdxP1['regional_fsn_flag'] !== undefined ? colIdxP1['regional_fsn_flag'] : colIdxP1['Regional_fsn_flag'];
   let idxSuper1 = colIdxP1['Super_Category'] !== undefined ? colIdxP1['Super_Category'] : (colIdxP1['super_category'] || colIdxP1['Supercategory'] || colIdxP1['supercategory']);
+  
   let idxOrg1 = colIdxP1['Organic_Flag'] || colIdxP1['organic_flag'];
   let idxEm1 = colIdxP1['Engagement_Manager'] || colIdxP1['engagement_manager'];
   let idxUbpl1 = colIdxP1['UB_PL_Flag'] || colIdxP1['ub_pl_flag'];
