@@ -59,10 +59,11 @@ function applyColorCoding(td, cellData, rowData) {
 $(document).ready(function() {
   $('.select2').select2({ width: '100%', placeholder: 'All' });
   
+  // Fetch default chunk [0]
   google.script.run
     .withSuccessHandler(downloadCSVsFromDrive)
     .withFailureHandler(err => { alert("Config fetch failed."); clearInterval(progressTimer); $('#loader-overlay').hide(); })
-    .getDriveDataConfig(0);
+    .getDriveDataConfig([0]);
     
   google.script.run
     .withSuccessHandler(renderHubDirectory)
@@ -81,15 +82,25 @@ $(document).ready(function() {
   });
 });
 
-function changeDayChunk(index) {
-  $('[id^=btn-chunk-]').removeClass('active');
-  $('#btn-chunk-' + index).addClass('active');
+// NEW: Handled Multiple Day Selections securely
+function applyDayChunks() {
+  let selectedChunks = [];
+  $('.chunk-checkbox:checked').each(function() {
+      selectedChunks.push(parseInt($(this).val()));
+  });
 
-  $('#loader-text').text("Fetching Day Range " + (index + 1) + "...");
+  if (selectedChunks.length === 0) {
+      alert("Please select at least one day range.");
+      $('#btn-chunk-0').prop('checked', true);
+      selectedChunks = [0];
+  }
+
+  $('#loader-text').text("Fetching Selected Days...");
   $('#loader-percent').text('0%');
   currentProgress = 0;
   $('#loader-overlay').show();
 
+  // SECURE MEMORY FLUSH
   rawDataP1 = []; rawDataP2 = []; 
   activeFilteredP1 = []; activeFilteredP2 = [];
   GLOBAL_DATES = [];
@@ -97,7 +108,7 @@ function changeDayChunk(index) {
   google.script.run
     .withSuccessHandler(downloadCSVsFromDrive)
     .withFailureHandler(err => { alert("File Split fetch failed."); $('#loader-overlay').hide(); })
-    .getDriveDataConfig(index);
+    .getDriveDataConfig(selectedChunks);
 }
 
 function toggleFullScreen() {
@@ -106,14 +117,50 @@ function toggleFullScreen() {
 }
 
 function downloadCSVsFromDrive(config) {
-  let p1Promise = fetchCSV(config.id1, config.token).then(data => { currentProgress = Math.max(currentProgress, 40); $('#loader-percent').text(currentProgress + '%'); $('#loader-text').text("Parsing Loss Tree..."); return data; });
-  let p2Promise = fetchCSV(config.id2, config.token).then(data => { currentProgress = Math.max(currentProgress, 80); $('#loader-percent').text(currentProgress + '%'); $('#loader-text').text("Parsing DoD & MSTN..."); return data; });
-  Promise.all([p1Promise, p2Promise]).then(([data1, data2]) => { 
-      clearInterval(progressTimer); $('#loader-percent').text('95%'); $('#loader-text').text("Building Dashboard...");
-      setTimeout(() => { initDashboardFromClient(data1, data2); $('#loader-percent').text('100%'); setTimeout(() => { $('#loader-overlay').fadeOut(400); }, 300); }, 50);
-  }).catch(err => { console.error(err); alert("Error parsing CSV data."); clearInterval(progressTimer); $('#loader-overlay').hide(); });
+  let p1Promise = fetchCSV(config.id1, config.token).then(data => { 
+      currentProgress = Math.max(currentProgress, 40); 
+      $('#loader-percent').text(currentProgress + '%'); 
+      $('#loader-text').text("Parsing Loss Tree..."); 
+      return data; 
+  });
+
+  // Fetch all selected DoD Chunks concurrently
+  let p2Promises = config.id2_array.map(id => fetchCSV(id, config.token));
+
+  Promise.all([p1Promise, Promise.all(p2Promises)]).then(([data1, data2Array]) => { 
+      clearInterval(progressTimer); 
+      $('#loader-percent').text('95%'); 
+      $('#loader-text').text("Building Dashboard...");
+
+      // Safely merge all DoD data arrays into one large array
+      let data2 = [];
+      let isFirst = true;
+      data2Array.forEach(chunkData => {
+        if (chunkData && chunkData.length > 0) {
+          if (isFirst) {
+            data2 = data2.concat(chunkData); // Keep header for the first chunk
+            isFirst = false;
+          } else {
+            let chunkWithoutHeader = chunkData.slice(1); // Drop headers for the rest
+            data2 = data2.concat(chunkWithoutHeader);
+          }
+        }
+      });
+
+      setTimeout(() => { 
+          initDashboardFromClient(data1, data2); 
+          $('#loader-percent').text('100%'); 
+          setTimeout(() => { $('#loader-overlay').fadeOut(400); }, 300); 
+      }, 50);
+  }).catch(err => { 
+      console.error(err); 
+      alert("Error parsing CSV data. The file might be missing or too large."); 
+      clearInterval(progressTimer); 
+      $('#loader-overlay').hide(); 
+  });
 }
 
+// Drive safely loads single files without crashing RAM (No range chunking)
 function fetchCSV(fileId, token) {
   return new Promise((resolve, reject) => {
     Papa.parse('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
@@ -160,11 +207,13 @@ function renderHubDirectory(data) {
   masterHubData = data;
   const cohorts = new Set();
   data.forEach(d => { if(d.cohort && d.cohort !== 'Error') cohorts.add(d.cohort); });
+  
   let pillsHtml = `<button class="hub-pill active" onclick="filterHubByCohort('All')">All</button>`;
   Array.from(cohorts).sort().forEach(c => {
     pillsHtml += `<button class="hub-pill" onclick="filterHubByCohort('${c.replace(/'/g, "\\'")}')">${c}</button>`;
   });
   $('#hub-pills-container').html(pillsHtml);
+  
   displayHubGrid(masterHubData);
 }
 
@@ -222,12 +271,20 @@ function filterHub() {
   displayHubGrid(filtered);
 }
 
+// TOGGLES VISIBILITY OF DAY BUTTONS
 function togglePage() {
   if ($('#btn-p0').is(':checked')) currentPage = 'p0';
   else if ($('#btn-p1').is(':checked')) currentPage = 'p1';
   else if ($('#btn-p2').is(':checked')) currentPage = 'p2';
   else if ($('#btn-p3').is(':checked')) currentPage = 'p3';
   else currentPage = 'hub';
+
+  // Make Day Selector ONLY visible on P2 and P3
+  if (currentPage === 'p2' || currentPage === 'p3') {
+    $('#day-range-toggles').removeClass('d-none');
+  } else {
+    $('#day-range-toggles').addClass('d-none');
+  }
 
   if (currentPage === 'hub') {
     $('#filter-card').slideUp(200);
