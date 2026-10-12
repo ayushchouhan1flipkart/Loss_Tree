@@ -138,7 +138,6 @@ function downloadCSVsFromDrive(config) {
       let data2 = [];
       let baseHeaders = [];
       
-      // UPGRADED SMART HEADER MAPPER: Strips all spaces and underscores to force perfect matches
       data2Array.forEach((chunkData, index) => {
         if (chunkData && chunkData.length > 0) {
           if (index === 0) {
@@ -286,9 +285,9 @@ function togglePage() {
   else currentPage = 'hub';
 
   if (currentPage === 'p2' || currentPage === 'p3') {
-    $('#dod-controls-container').removeClass('d-none');
+    $('#day-range-toggles').removeClass('d-none');
   } else {
-    $('#dod-controls-container').addClass('d-none');
+    $('#day-range-toggles').addClass('d-none');
   }
 
   if (currentPage === 'hub') {
@@ -707,13 +706,13 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
       if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
 
-      // FIX: ROBUST LOSS REMARK MAPPING
+      // HARDCODED BYPASS for "network_issue" and "ASP drop"
       const rawRemark = String(row[rIdx] || '').trim().toLowerCase();
       let remark = 'Other Loss';
       
-      if (rawRemark === 'asp_drop' || rawRemark === 'asp drop') {
+      if (rawRemark === 'asp drop' || rawRemark === 'asp_drop') {
           remark = 'ASP Drop';
-      } else if (rawRemark === 'network_change' || rawRemark === 'network change' || rawRemark === 'network_issue' || rawRemark === 'network issue') {
+      } else if (rawRemark === 'network issue' || rawRemark === 'network_issue' || rawRemark === 'network change' || rawRemark === 'network_change') {
           remark = 'Network Issue';
       } else {
           for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
@@ -813,7 +812,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
 
       if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
 
-      const remark = (row[remIdx] || '').toString().trim().toLowerCase(), buyNode = (row[buyIdx] || '').toString().trim().toLowerCase();
+      const remark = String(row[remIdx] || '').trim().toLowerCase(), buyNode = String(row[buyIdx] || '').trim().toLowerCase();
       const countFSN = Number(row[fsnIdx]) || 0, countTotalDS = Number(row[tdIdx]) || 0, countInstockDS = Number(row[idiIdx]) || 0;
 
       let isAllowedSH = false; let isAllowedDS = false;
@@ -1085,9 +1084,9 @@ function exportRawCSV() {
       const rawRemark = String(row[colIdxP1['Loss_Remark']] || '').trim().toLowerCase();
       let remark = 'Other Loss';
       
-      if (rawRemark === 'asp_drop' || rawRemark === 'asp drop') {
+      if (rawRemark === 'asp drop' || rawRemark === 'asp_drop') {
           remark = 'ASP Drop';
-      } else if (rawRemark === 'network_change' || rawRemark === 'network change' || rawRemark === 'network_issue' || rawRemark === 'network issue') {
+      } else if (rawRemark === 'network issue' || rawRemark === 'network_issue' || rawRemark === 'network change' || rawRemark === 'network_change') {
           remark = 'Network Issue';
       } else {
           for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
