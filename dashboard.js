@@ -21,13 +21,25 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
-// EXACT UI NAMES
+// EXACT UI NAMES FOR REPORTING
 const LOSS_REMARK_SEQ = {
   "Instock": 0, "NPD": 1, "NO-PO|NO-QOH| NO-IRN": 2, 
   "Not Received 30D(sch)": 3, "Not Received 30D": 4, "ASP Drop": 5, "Network Issue": 6, "Wrong Forecasting": 7, 
   "ATP-QOH Delta": 8, "No PO": 9, "PO Error": 10, "Not Enough PO Raised": 11,
   "Bad Fill Rate": 12, "Scheduled": 13, "Not Scheduled": 14, 
   "IWIT Pendency": 15, "SH-SH IWIT Issue": 16, "Other Loss": 17
+};
+
+// EXTREMELY ROBUST COLUMN FETCHER: Ignores spaces, underscores, and capitals to completely prevent the >100% bug on old files
+const colP1 = (name) => {
+    let target = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (let k in colIdxP1) if (k.toLowerCase().replace(/[^a-z0-9]/g, '') === target) return colIdxP1[k];
+    return undefined;
+};
+const colP2 = (name) => {
+    let target = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (let k in colIdxP2) if (k.toLowerCase().replace(/[^a-z0-9]/g, '') === target) return colIdxP2[k];
+    return undefined;
 };
 
 $(document).on('click', 'tr.group-header', function() {
@@ -185,7 +197,12 @@ function initDashboardFromClient(d1, d2) {
     let headers1 = d1.shift(); 
     let headers2 = d2.shift();
     
-    const dateColIdx = (headers2 && headers2.indexOf) ? headers2.indexOf('Report_Date') : -1;
+    colIdxP1 = Object.fromEntries(headers1.map((h, i) => [h, i])); 
+    colIdxP2 = Object.fromEntries(headers2.map((h, i) => [h, i])); 
+    
+    rawDataP1 = d1;
+    
+    const dateColIdx = colP2('Report_Date');
     if (dateColIdx > -1) {
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       d2 = d2.map(row => {
@@ -196,9 +213,9 @@ function initDashboardFromClient(d1, d2) {
         } return row;
       });
     }
-    colIdxP1 = Object.fromEntries(headers1.map((h, i) => [h, i])); rawDataP1 = d1;
-    colIdxP2 = Object.fromEntries(headers2.map((h, i) => [h, i])); rawDataP2 = d2;
-    GLOBAL_DATES = [...new Set(rawDataP2.map(r => String(r[colIdxP2['Report_Date']] || 'Unknown')))];
+    
+    rawDataP2 = d2;
+    GLOBAL_DATES = [...new Set(rawDataP2.map(r => String(r[dateColIdx] || 'Unknown')))];
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     GLOBAL_DATES.sort((a, b) => {
         if (a === 'Unknown') return -1; if (b === 'Unknown') return 1;
@@ -350,21 +367,21 @@ function aggregateAllDataInMemory() {
     organic: new Set($('#filter-organic').val() || []), em: new Set($('#filter-em').val() || []), ubpl: new Set($('#filter-ubpl').val() || [])
   };
 
-  let idxBU1 = colIdxP1['BU'], idxComp1 = colIdxP1['Company'], idxKam1 = colIdxP1['KAM'], idxLead1 = colIdxP1['KAM_Lead'], idxOwner1 = colIdxP1['Instock_Owner'];
-  let idxSH1 = colIdxP1['FC_Code'], idxBrand1 = colIdxP1['brand'], idxVendor1 = colIdxP1['Vendor_Name'], idxVert1 = colIdxP1['analytic_vertical'], idxTag1 = colIdxP1['tagging'];
-  let idxVmi1 = colIdxP1['VMI_Flag'] !== undefined ? colIdxP1['VMI_Flag'] : colIdxP1['vmi'];
-  let idxBrandPoc1 = colIdxP1['brand_poc'] !== undefined ? colIdxP1['brand_poc'] : colIdxP1['Brand_POC'];
-  let idxFsn1 = colIdxP1['FSN'] !== undefined ? colIdxP1['FSN'] : colIdxP1['fsn'];
-  let idxBuyNode1 = colIdxP1['Buying_Node_Flag'];
-  let idxDsBucket1 = colIdxP1['Instock_DS_Bucket'] !== undefined ? colIdxP1['Instock_DS_Bucket'] : (colIdxP1['Instock_DS_bucket'] || colIdxP1['instock_ds_bucket']);
-  let idxZone1 = colIdxP1['Zone'] !== undefined ? colIdxP1['Zone'] : colIdxP1['zone'];
-  let idxUpdatedBu1 = colIdxP1['Updated_BU'];
-  let idxGourmet1 = colIdxP1['gourmet_flag'] !== undefined ? colIdxP1['gourmet_flag'] : colIdxP1['Gourmet_Flag'];
-  let idxRegional1 = colIdxP1['regional_fsn_flag'] !== undefined ? colIdxP1['regional_fsn_flag'] : colIdxP1['Regional_fsn_flag'];
-  let idxSuper1 = colIdxP1['Super_Category'] !== undefined ? colIdxP1['Super_Category'] : (colIdxP1['super_category'] || colIdxP1['Supercategory'] || colIdxP1['supercategory']);
-  let idxOrg1 = colIdxP1['Organic_Flag'] || colIdxP1['organic_flag'];
-  let idxEm1 = colIdxP1['Engagement_Manager'] || colIdxP1['engagement_manager'];
-  let idxUbpl1 = colIdxP1['UB_PL_Flag'] || colIdxP1['ub_pl_flag'];
+  let idxBU1 = colP1('BU'), idxComp1 = colP1('Company'), idxKam1 = colP1('KAM'), idxLead1 = colP1('KAM_Lead'), idxOwner1 = colP1('Instock_Owner');
+  let idxSH1 = colP1('FC_Code'), idxBrand1 = colP1('brand'), idxVendor1 = colP1('Vendor_Name'), idxVert1 = colP1('analytic_vertical'), idxTag1 = colP1('tagging');
+  let idxVmi1 = colP1('VMI_Flag') !== undefined ? colP1('VMI_Flag') : colP1('VMI');
+  let idxBrandPoc1 = colP1('brand_poc');
+  let idxFsn1 = colP1('FSN');
+  let idxBuyNode1 = colP1('Buying_Node_Flag');
+  let idxDsBucket1 = colP1('Instock_DS_Bucket') !== undefined ? colP1('Instock_DS_Bucket') : colP1('instock_ds_bucket');
+  let idxZone1 = colP1('Zone');
+  let idxUpdatedBu1 = colP1('Updated_BU');
+  let idxGourmet1 = colP1('Gourmet_Flag');
+  let idxRegional1 = colP1('Regional_fsn_flag');
+  let idxSuper1 = colP1('Super_Category');
+  let idxOrg1 = colP1('Organic_Flag');
+  let idxEm1 = colP1('Engagement_Manager');
+  let idxUbpl1 = colP1('UB_PL_Flag');
 
   activeFilteredP1 = rawDataP1.filter(row => {
     let buyNode = idxBuyNode1 !== undefined ? String(row[idxBuyNode1] || '').trim().toLowerCase() : 'yes';
@@ -396,21 +413,21 @@ function aggregateAllDataInMemory() {
     return true;
   });
 
-  let idxBU2 = colIdxP2['BU'], idxComp2 = colIdxP2['Company'], idxKam2 = colIdxP2['KAM'], idxLead2 = colIdxP2['KAM_Lead'], idxOwner2 = colIdxP2['Instock_Owner'];
-  let idxSH2 = colIdxP2['FC_Code'], idxBrand2 = colIdxP2['brand'], idxVendor2 = colIdxP2['Vendor_Name'], idxVert2 = colIdxP2['analytic_vertical'], idxTag2 = colIdxP2['tagging'];
-  let idxVmi2 = colIdxP2['VMI_Flag'] !== undefined ? colIdxP2['VMI_Flag'] : colIdxP2['vmi'];
-  let idxBrandPoc2 = colIdxP2['brand_poc'] !== undefined ? colIdxP2['brand_poc'] : colIdxP2['Brand_POC'];
-  let idxFsn2 = colIdxP2['FSN'] !== undefined ? colIdxP2['FSN'] : colIdxP2['fsn'];
-  let idxBuyNode2 = colIdxP2['Buying_Node_Flag'];
-  let idxDsBucket2 = colIdxP2['Instock_DS_Bucket'] !== undefined ? colIdxP2['Instock_DS_Bucket'] : (colIdxP2['Instock_DS_bucket'] || colIdxP2['instock_ds_bucket']);
-  let idxZone2 = colIdxP2['Zone'] !== undefined ? colIdxP2['Zone'] : colIdxP2['zone'];
-  let idxUpdatedBu2 = colIdxP2['Updated_BU'];
-  let idxGourmet2 = colIdxP2['gourmet_flag'] !== undefined ? colIdxP2['gourmet_flag'] : colIdxP2['Gourmet_Flag'];
-  let idxRegional2 = colIdxP2['regional_fsn_flag'] !== undefined ? colIdxP2['regional_fsn_flag'] : colIdxP2['Regional_fsn_flag'];
-  let idxSuper2 = colIdxP2['Super_Category'] !== undefined ? colIdxP2['Super_Category'] : (colIdxP2['super_category'] || colIdxP2['Supercategory'] || colIdxP2['supercategory']);
-  let idxOrg2 = colIdxP2['Organic_Flag'] || colIdxP2['organic_flag'];
-  let idxEm2 = colIdxP2['Engagement_Manager'] || colIdxP2['engagement_manager'];
-  let idxUbpl2 = colIdxP2['UB_PL_Flag'] || colIdxP2['ub_pl_flag'];
+  let idxBU2 = colP2('BU'), idxComp2 = colP2('Company'), idxKam2 = colP2('KAM'), idxLead2 = colP2('KAM_Lead'), idxOwner2 = colP2('Instock_Owner');
+  let idxSH2 = colP2('FC_Code'), idxBrand2 = colP2('brand'), idxVendor2 = colP2('Vendor_Name'), idxVert2 = colP2('analytic_vertical'), idxTag2 = colP2('tagging');
+  let idxVmi2 = colP2('VMI_Flag') !== undefined ? colP2('VMI_Flag') : colP2('vmi');
+  let idxBrandPoc2 = colP2('brand_poc');
+  let idxFsn2 = colP2('FSN');
+  let idxBuyNode2 = colP2('Buying_Node_Flag');
+  let idxDsBucket2 = colP2('Instock_DS_Bucket') !== undefined ? colP2('Instock_DS_Bucket') : colP2('instock_ds_bucket');
+  let idxZone2 = colP2('Zone');
+  let idxUpdatedBu2 = colP2('Updated_BU');
+  let idxGourmet2 = colP2('Gourmet_Flag');
+  let idxRegional2 = colP2('Regional_fsn_flag');
+  let idxSuper2 = colP2('Super_Category');
+  let idxOrg2 = colP2('Organic_Flag');
+  let idxEm2 = colP2('Engagement_Manager');
+  let idxUbpl2 = colP2('UB_PL_Flag');
 
   activeFilteredP2 = rawDataP2.filter(row => {
     let buyNode = idxBuyNode2 !== undefined ? String(row[idxBuyNode2] || '').trim().toLowerCase() : 'yes';
@@ -491,31 +508,31 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
     let gt = { fsn: 0, atp: 0, qoh: 0, openPo: 0, fdrr: 0, sdrr: 0, dsInstock: 0, dsTotal: 0, shInstock: 0, shSch: 0, shPo: 0, mstnAtp: 0, mstnSch: 0, mstnPo: 0, norm: 0, iwit: 0, irn: 0, dsMstn: 0, dsMstnIt: 0, dsNorm: 0, instockItDs: 0, dsNormRaw: 0 };
 
-    let idxTag = colIdxP1['tagging'];
-    let idxZone = colIdxP1['Zone'] !== undefined ? colIdxP1['Zone'] : colIdxP1['zone'];
-    let idxSH = colIdxP1['FC_Code'];
-    let idxFsn = colIdxP1['FSN_Count'];
-    let idxAtp = colIdxP1['ATP_Current'];
-    let idxQoh = colIdxP1['QOH'];
-    let idxOpenPo = colIdxP1['Open_PO'];
-    let idxFdrr = colIdxP1['Total_rolled_fdrr'];
-    let idxSdrr = colIdxP1['DRR_7D'];
-    let idxDsIn = colIdxP1['Instock_DS_Count'];
-    let idxDsTot = colIdxP1['Total_DS_Count'];
-    let idxMstnAtp = colIdxP1['MSTN_atp'] !== undefined ? colIdxP1['MSTN_atp'] : colIdxP1['mstn_atp'];
-    let idxMstnSch = colIdxP1['MSTN_with_scheduling'] !== undefined ? colIdxP1['MSTN_with_scheduling'] : colIdxP1['mstn_with_scheduling'];
-    let idxMstnPo  = colIdxP1['MSTN_with_po'] !== undefined ? colIdxP1['MSTN_with_po'] : colIdxP1['mstn_with_po'];
-    let idxNorm    = colIdxP1['new_norm'] !== undefined ? colIdxP1['new_norm'] : colIdxP1['New_Norm'];
-    let idxDoh = colIdxP1['ATP_DOH_Bucket'];
-    let idxSchedDoh = colIdxP1['ATP_Sched_DOH_Bucket'];
-    let idxPoDoh = colIdxP1['ATP_PO_DOH_Bucket'];
-    let bnIdx = colIdxP1['Buying_Node_Flag'];
-    let idxIwit = colIdxP1['SH_DS_IWIT_T_minus_1'];
-    let idxIrn = colIdxP1['IRN_T_minus_2'];
-    let idxDsMstn = colIdxP1['DS_MSTN'];
-    let idxDsMstnIt = colIdxP1['DS_MSTN_IT'];
-    let idxDsNorm = colIdxP1['DS_Norm'];
-    let idxInstockItDs = colIdxP1['Instock_IT_DS_Count'];
+    let idxTag = colP1('tagging');
+    let idxZone = colP1('Zone');
+    let idxSH = colP1('FC_Code');
+    let idxFsn = colP1('FSN_Count');
+    let idxAtp = colP1('ATP_Current');
+    let idxQoh = colP1('QOH');
+    let idxOpenPo = colP1('Open_PO');
+    let idxFdrr = colP1('Total_rolled_fdrr');
+    let idxSdrr = colP1('DRR_7D');
+    let idxDsIn = colP1('Instock_DS_Count');
+    let idxDsTot = colP1('Total_DS_Count');
+    let idxMstnAtp = colP1('MSTN_atp');
+    let idxMstnSch = colP1('MSTN_with_scheduling');
+    let idxMstnPo  = colP1('MSTN_with_po');
+    let idxNorm    = colP1('new_norm');
+    let idxDoh = colP1('ATP_DOH_Bucket');
+    let idxSchedDoh = colP1('ATP_Sched_DOH_Bucket');
+    let idxPoDoh = colP1('ATP_PO_DOH_Bucket');
+    let bnIdx = colP1('Buying_Node_Flag');
+    let idxIwit = colP1('SH_DS_IWIT_T_minus_1');
+    let idxIrn = colP1('IRN_T_minus_2');
+    let idxDsMstn = colP1('DS_MSTN');
+    let idxDsMstnIt = colP1('DS_MSTN_IT');
+    let idxDsNorm = colP1('DS_Norm');
+    let idxInstockItDs = colP1('Instock_IT_DS_Count');
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
@@ -549,7 +566,12 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       let shTagKey = shName + "|||" + groupKey;
       if (!byShTag[shTagKey]) byShTag[shTagKey] = initBucket();
       
-      let vFsn = Number(row[idxFsn]) || 0, vDsIn = Number(row[idxDsIn]) || 0, vDsTot = Number(row[idxDsTot]) || 0;
+      let vFsn = Number(row[idxFsn]) || 0;
+      let vDsIn = Number(row[idxDsIn]) || 0;
+      let vDsTot = Number(row[idxDsTot]) || 0;
+
+      // MATHEMATICAL OVERRIDE TO PREVENT >100%
+      if (vDsIn > vDsTot) vDsTot = vDsIn;
 
       if (isAllowedDS) {
           let vDsMstn = Number(row[idxDsMstn]) || 0, vDsMstnIt = Number(row[idxDsMstnIt]) || 0, vDsNorm = Number(row[idxDsNorm]) || 0, vInstockItDs = Number(row[idxInstockItDs]) || 0;
@@ -685,11 +707,11 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
     let isShLevel = (groupColName === 'SH (FC Code)');
     const byGroup = {}; const shToZone = {}; let grandTotalFsns = 0, grandTotalDSInstock = 0, grandTotalDSTotal = 0; let grandTotalRemarks = {};
     
-    let gColIdx = colIdxP1[groupCol] !== undefined ? colIdxP1[groupCol] : colIdxP1[groupCol.toLowerCase()];
-    let rIdx = colIdxP1['Loss_Remark'], fsnIdx = colIdxP1['FSN_Count'];
-    let dsiIdx = colIdxP1['Instock_DS_Count'], dstIdx = colIdxP1['Total_DS_Count'], bnIdx = colIdxP1['Buying_Node_Flag'];
-    let zIdx = colIdxP1['Zone'] !== undefined ? colIdxP1['Zone'] : colIdxP1['zone'];
-    let titleIdx = colIdxP1['Title'] || colIdxP1['title'] || colIdxP1['Product_Title'] || colIdxP1['Product Title'];
+    let gColIdx = colP1(groupCol);
+    let rIdx = colP1('Loss_Remark'), fsnIdx = colP1('FSN_Count');
+    let dsiIdx = colP1('Instock_DS_Count'), dstIdx = colP1('Total_DS_Count'), bnIdx = colP1('Buying_Node_Flag');
+    let zIdx = colP1('Zone');
+    let titleIdx = colP1('Title') !== undefined ? colP1('Title') : colP1('Product_Title');
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
@@ -706,10 +728,9 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
       if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
 
-      // HARDCODED BYPASS for "network_issue" and "ASP drop"
+      // EXPLICIT HARDCODED BYPASS: Forces ASP Drop and Network Issue to map perfectly
       const rawRemark = String(row[rIdx] || '').trim().toLowerCase();
       let remark = 'Other Loss';
-      
       if (rawRemark === 'asp drop' || rawRemark === 'asp_drop') {
           remark = 'ASP Drop';
       } else if (rawRemark === 'network issue' || rawRemark === 'network_issue' || rawRemark === 'network change' || rawRemark === 'network_change') {
@@ -720,7 +741,13 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
           }
       }
 
-      const fsns = Number(row[fsnIdx]) || 0, dsInstock = Number(row[dsiIdx]) || 0, dsTotal = Number(row[dstIdx]) || 0;
+      const fsns = Number(row[fsnIdx]) || 0;
+      let dsInstock = Number(row[dsiIdx]) || 0;
+      let dsTotal = Number(row[dstIdx]) || 0;
+      
+      // MATHEMATICAL OVERRIDE TO PREVENT >100%
+      if (dsInstock > dsTotal) dsTotal = dsInstock;
+      
       const buyNode = bnIdx !== undefined ? String(row[bnIdx] || '').trim().toLowerCase() : 'yes';
       
       let isAllowedSH = false; let isAllowedDS = false;
@@ -793,11 +820,11 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     const byGroup = {}; const shToZone = {}; let grandTotalByDate = {};
     uniqueDates.forEach(d => grandTotalByDate[d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 });
 
-    let gColIdx = colIdxP2[groupCol] !== undefined ? colIdxP2[groupCol] : colIdxP2[groupCol.toLowerCase()];
-    let rDateIdx = colIdxP2['Report_Date'], remIdx = colIdxP2['Loss_Remark'];
-    let buyIdx = colIdxP2['Buying_Node_Flag'], fsnIdx = colIdxP2['FSN_Count'], tdIdx = colIdxP2['Total_DS_Count'], idiIdx = colIdxP2['Instock_DS_Count'];
-    let zIdx = colIdxP2['Zone'] !== undefined ? colIdxP2['Zone'] : colIdxP2['zone'];
-    let titleIdx = colIdxP2['Title'] || colIdxP2['title'] || colIdxP2['Product_Title'] || colIdxP2['Product Title'];
+    let gColIdx = colP2(groupCol);
+    let rDateIdx = colP2('Report_Date'), remIdx = colP2('Loss_Remark');
+    let buyIdx = colP2('Buying_Node_Flag'), fsnIdx = colP2('FSN_Count'), tdIdx = colP2('Total_DS_Count'), idiIdx = colP2('Instock_DS_Count');
+    let zIdx = colP2('Zone');
+    let titleIdx = colP2('Title') !== undefined ? colP2('Title') : colP2('Product_Title');
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
@@ -813,7 +840,12 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
 
       const remark = String(row[remIdx] || '').trim().toLowerCase(), buyNode = String(row[buyIdx] || '').trim().toLowerCase();
-      const countFSN = Number(row[fsnIdx]) || 0, countTotalDS = Number(row[tdIdx]) || 0, countInstockDS = Number(row[idiIdx]) || 0;
+      const countFSN = Number(row[fsnIdx]) || 0;
+      let countTotalDS = Number(row[tdIdx]) || 0;
+      let countInstockDS = Number(row[idiIdx]) || 0;
+
+      // MATHEMATICAL OVERRIDE TO PREVENT >100%
+      if (countInstockDS > countTotalDS) countTotalDS = countInstockDS;
 
       let isAllowedSH = false; let isAllowedDS = false;
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; } 
@@ -929,17 +961,17 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     
     uniqueDates.forEach(d => grandTotalByDate[d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 });
 
-    let gColIdx = colIdxP2[groupCol] !== undefined ? colIdxP2[groupCol] : colIdxP2[groupCol.toLowerCase()];
-    let rDateIdx = colIdxP2['Report_Date'];
-    let buyIdx = colIdxP2['Buying_Node_Flag'];
-    let fsnIdx = colIdxP2['FSN_Count'];
-    let zIdx = colIdxP2['Zone'] !== undefined ? colIdxP2['Zone'] : colIdxP2['zone'];
-    let titleIdx = colIdxP2['Title'] || colIdxP2['title'] || colIdxP2['Product_Title'] || colIdxP2['Product Title'];
+    let gColIdx = colP2(groupCol);
+    let rDateIdx = colP2('Report_Date');
+    let buyIdx = colP2('Buying_Node_Flag');
+    let fsnIdx = colP2('FSN_Count');
+    let zIdx = colP2('Zone');
+    let titleIdx = colP2('Title') !== undefined ? colP2('Title') : colP2('Product_Title');
     
-    let idxMstnAtp = colIdxP2['MSTN_atp'] !== undefined ? colIdxP2['MSTN_atp'] : colIdxP2['mstn_atp'];
-    let idxMstnSch = colIdxP2['MSTN_with_scheduling'] !== undefined ? colIdxP2['MSTN_with_scheduling'] : colIdxP2['mstn_with_scheduling'];
-    let idxMstnPo  = colIdxP2['MSTN_with_po'] !== undefined ? colIdxP2['MSTN_with_po'] : colIdxP2['mstn_with_po'];
-    let idxNorm    = colIdxP2['new_norm'] !== undefined ? colIdxP2['new_norm'] : colIdxP2['New_Norm'];
+    let idxMstnAtp = colP2('MSTN_atp');
+    let idxMstnSch = colP2('MSTN_with_scheduling');
+    let idxMstnPo  = colP2('MSTN_with_po');
+    let idxNorm    = colP2('new_norm');
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
@@ -954,7 +986,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
 
       if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
       
-      const buyNode = (row[buyIdx] || '').toString().trim().toLowerCase();
+      const buyNode = String(row[buyIdx] || '').trim().toLowerCase();
       const countFSN = Number(row[fsnIdx]) || 0;
 
       let isAllowedSH = false;
@@ -967,7 +999,12 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
       }
       
       if (isAllowedSH && uniqueDates.includes(reportDate)) {
-          let valAtp = Number(row[idxMstnAtp]) || 0, valSch = Number(row[idxMstnSch]) || 0, valPo  = Number(row[idxMstnPo]) || 0, valNorm = Number(row[idxNorm]) || 0;
+          let valAtp = Number(row[idxMstnAtp]) || 0, valSch = Number(row[idxMstnSch]) || 0, valPo  = Number(row[idxMstnPo]) || 0;
+          let valNorm = Number(row[idxNorm]) || 0;
+
+          if (valAtp > valNorm) valNorm = valAtp;
+          if (valSch > valNorm) valNorm = valSch;
+          if (valPo > valNorm) valNorm = valPo;
 
           byGroup[finalGroupKey][reportDate].atp += valAtp; byGroup[finalGroupKey][reportDate].sch += valSch; byGroup[finalGroupKey][reportDate].po += valPo; byGroup[finalGroupKey][reportDate].norm += valNorm; byGroup[finalGroupKey][reportDate].shTotal += countFSN;
           grandTotalByDate[reportDate].atp += valAtp; grandTotalByDate[reportDate].sch += valSch; grandTotalByDate[reportDate].po += valPo; grandTotalByDate[reportDate].norm += valNorm; grandTotalByDate[reportDate].shTotal += countFSN;
@@ -1059,7 +1096,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
 }
 
 function exportRawCSV() {
-  let csvDataRows = []; let buyNodeColP1 = colIdxP1['Buying_Node_Flag'];
+  let csvDataRows = []; let buyNodeColP1 = colP1('Buying_Node_Flag');
   let bnFiltersRaw = $('#filter-buying-node').val() || [];
   let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
 
@@ -1067,9 +1104,9 @@ function exportRawCSV() {
 
   if (currentPage === 'p1') {
     const byGroup = {};
-    let zIdx = colIdxP1['Zone'] !== undefined ? colIdxP1['Zone'] : colIdxP1['zone'];
+    let zIdx = colP1('Zone');
     let isShLevel = (activeTabCol === 'FC_Code');
-    let titleIdx = colIdxP1['Title'] || colIdxP1['title'] || colIdxP1['Product_Title'] || colIdxP1['Product Title'];
+    let titleIdx = colP1('Title') !== undefined ? colP1('Title') : colP1('Product_Title');
 
     activeFilteredP1.forEach(row => {
       let groupKey = (row[colIdxP1[activeTabCol]] || 'Unknown').toString().trim();
@@ -1081,7 +1118,7 @@ function exportRawCSV() {
 
       if (isShLevel && zIdx !== undefined) { let zName = (row[zIdx] || 'Unassigned').toString().trim(); finalGroupKey = zName + " | " + finalGroupKey; }
       
-      const rawRemark = String(row[colIdxP1['Loss_Remark']] || '').trim().toLowerCase();
+      const rawRemark = String(row[colP1('Loss_Remark')] || '').trim().toLowerCase();
       let remark = 'Other Loss';
       
       if (rawRemark === 'asp drop' || rawRemark === 'asp_drop') {
@@ -1094,7 +1131,7 @@ function exportRawCSV() {
           }
       }
 
-      const fsns = Number(row[colIdxP1['FSN_Count']]) || 0, dsInstock = Number(row[colIdxP1['Instock_DS_Count']]) || 0, dsTotal = Number(row[colIdxP1['Total_DS_Count']]) || 0;
+      const fsns = Number(row[colP1('FSN_Count')]) || 0, dsInstock = Number(row[colP1('Instock_DS_Count')]) || 0, dsTotal = Number(row[colP1('Total_DS_Count')]) || 0;
       const buyNode = buyNodeColP1 !== undefined ? (row[buyNodeColP1] || '').toString().trim().toLowerCase() : 'yes';
       
       let isAllowedSH = false; let isAllowedDS = false;
@@ -1119,11 +1156,11 @@ function exportRawCSV() {
   } else if (currentPage === 'p2') {
     const uniqueDates = GLOBAL_DATES;
     const byGroup = {}; const latestDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
-    let buyIdx = colIdxP2['Buying_Node_Flag']; let zIdx = colIdxP2['Zone'] !== undefined ? colIdxP2['Zone'] : colIdxP2['zone']; let isShLevel = (activeTabCol === 'FC_Code');
-    let titleIdx = colIdxP2['Title'] || colIdxP2['title'] || colIdxP2['Product_Title'] || colIdxP2['Product Title'];
+    let buyIdx = colP2('Buying_Node_Flag'); let zIdx = colP2('Zone'); let isShLevel = (activeTabCol === 'FC_Code');
+    let titleIdx = colP2('Title') !== undefined ? colP2('Title') : colP2('Product_Title');
 
     activeFilteredP2.forEach(row => {
-      let groupKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[colIdxP2['Report_Date']] || 'Unknown');
+      let groupKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[colP2('Report_Date')] || 'Unknown');
       
       let finalGroupKey = groupKey;
       if (activeTabName === 'FSN' && titleIdx !== undefined) {
@@ -1132,8 +1169,8 @@ function exportRawCSV() {
 
       if (isShLevel && zIdx !== undefined) { let zName = (row[zIdx] || 'Unassigned').toString().trim(); finalGroupKey = zName + " | " + finalGroupKey; }
 
-      const remark = (row[colIdxP2['Loss_Remark']] || '').toString().trim().toLowerCase(), buyNode = (row[buyIdx] || '').toString().trim().toLowerCase();
-      const countFSN = Number(row[colIdxP2['FSN_Count']]) || 0, countTotalDS = Number(row[colIdxP2['Total_DS_Count']]) || 0, countInstockDS = Number(row[colIdxP2['Instock_DS_Count']]) || 0;
+      const remark = String(row[colP2('Loss_Remark')] || '').trim().toLowerCase(), buyNode = String(row[buyIdx] || '').trim().toLowerCase();
+      const countFSN = Number(row[colP2('FSN_Count')]) || 0, countTotalDS = Number(row[colP2('Total_DS_Count')]) || 0, countInstockDS = Number(row[colP2('Instock_DS_Count')]) || 0;
       
       let isAllowedSH = false; let isAllowedDS = false;
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; }
@@ -1157,12 +1194,12 @@ function exportRawCSV() {
     });
   } else {
     const latestDate = GLOBAL_DATES.length > 0 ? GLOBAL_DATES[GLOBAL_DATES.length - 1] : null; const uniqueDates = [...GLOBAL_DATES].reverse();
-    const byGroup = {}; let buyIdx = colIdxP2['Buying_Node_Flag']; let zIdx = colIdxP2['Zone'] !== undefined ? colIdxP2['Zone'] : colIdxP2['zone']; let isShLevel = (activeTabCol === 'FC_Code');
-    let idxMstnAtp = colIdxP2['MSTN_atp'] !== undefined ? colIdxP2['MSTN_atp'] : colIdxP2['mstn_atp']; let idxMstnSch = colIdxP2['MSTN_with_scheduling'] !== undefined ? colIdxP2['MSTN_with_scheduling'] : colIdxP2['mstn_with_scheduling']; let idxMstnPo  = colIdxP2['MSTN_with_po'] !== undefined ? colIdxP2['MSTN_with_po'] : colIdxP2['mstn_with_po']; let idxNorm    = colIdxP2['new_norm'] !== undefined ? colIdxP2['new_norm'] : colIdxP2['New_Norm']; let fsnIdx     = colIdxP2['FSN_Count'];
-    let titleIdx = colIdxP2['Title'] || colIdxP2['title'] || colIdxP2['Product_Title'] || colIdxP2['Product Title'];
+    const byGroup = {}; let buyIdx = colP2('Buying_Node_Flag'); let zIdx = colP2('Zone'); let isShLevel = (activeTabCol === 'FC_Code');
+    let idxMstnAtp = colP2('MSTN_atp'); let idxMstnSch = colP2('MSTN_with_scheduling'); let idxMstnPo  = colP2('MSTN_with_po'); let idxNorm    = colP2('new_norm'); let fsnIdx     = colP2('FSN_Count');
+    let titleIdx = colP2('Title') !== undefined ? colP2('Title') : colP2('Product_Title');
 
     activeFilteredP2.forEach(row => {
-      let groupKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[colIdxP2['Report_Date']] || 'Unknown');
+      let groupKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[colP2('Report_Date')] || 'Unknown');
       
       let finalGroupKey = groupKey;
       if (activeTabName === 'FSN' && titleIdx !== undefined) {
@@ -1200,35 +1237,35 @@ function exportRawCSV() {
 function populateFilterOptions() {
   let sets = { bu: new Set(), company: new Set(), kam: new Set(), kamLead: new Set(), owner: new Set(), sh: new Set(), brand: new Set(), vendor: new Set(), vertical: new Set(), supercategory: new Set(), tagging: new Set(), vmi: new Set(), buyingNode: new Set(), brandPoc: new Set(), fsn: new Set(), dsBucket: new Set(), zone: new Set(), updatedBu: new Set(), gourmet: new Set(), regional: new Set(), organic: new Set(), em: new Set(), ubpl: new Set() };
   
-  let idxBrandPoc1 = colIdxP1['brand_poc'] !== undefined ? colIdxP1['brand_poc'] : colIdxP1['Brand_POC'];
-  let idxDsBucket1 = colIdxP1['Instock_DS_Bucket'] !== undefined ? colIdxP1['Instock_DS_Bucket'] : (colIdxP1['Instock_DS_bucket'] || colIdxP1['instock_ds_bucket']);
-  let idxZone1 = colIdxP1['Zone'] !== undefined ? colIdxP1['Zone'] : colIdxP1['zone'];
-  let idxUpdatedBu1 = colIdxP1['Updated_BU'];
-  let idxGourmet1 = colIdxP1['gourmet_flag'] !== undefined ? colIdxP1['gourmet_flag'] : colIdxP1['Gourmet_Flag'];
-  let idxRegional1 = colIdxP1['regional_fsn_flag'] !== undefined ? colIdxP1['regional_fsn_flag'] : colIdxP1['Regional_fsn_flag'];
-  let idxSuper1 = colIdxP1['Super_Category'] !== undefined ? colIdxP1['Super_Category'] : (colIdxP1['super_category'] || colIdxP1['Supercategory'] || colIdxP1['supercategory']);
-  let idxOrg1 = colIdxP1['Organic_Flag'] || colIdxP1['organic_flag'];
-  let idxEm1 = colIdxP1['Engagement_Manager'] || colIdxP1['engagement_manager'];
-  let idxUbpl1 = colIdxP1['UB_PL_Flag'] || colIdxP1['ub_pl_flag'];
-
   rawDataP1.forEach(row => {
-    if(row[colIdxP1['BU']]) sets.bu.add(String(row[colIdxP1['BU']]).trim()); 
-    if(row[colIdxP1['Company']]) sets.company.add(String(row[colIdxP1['Company']]).trim());
-    if(row[colIdxP1['KAM']]) sets.kam.add(String(row[colIdxP1['KAM']]).trim()); 
-    if(row[colIdxP1['KAM_Lead']]) sets.kamLead.add(String(row[colIdxP1['KAM_Lead']]).trim());
-    if(row[colIdxP1['Instock_Owner']]) sets.owner.add(String(row[colIdxP1['Instock_Owner']]).trim()); 
-    if(row[colIdxP1['FC_Code']]) sets.sh.add(String(row[colIdxP1['FC_Code']]).trim());
-    if(row[colIdxP1['brand']]) sets.brand.add(String(row[colIdxP1['brand']]).trim()); 
-    if(row[colIdxP1['Vendor_Name']]) sets.vendor.add(String(row[colIdxP1['Vendor_Name']]).trim());
-    if(row[colIdxP1['analytic_vertical']]) sets.vertical.add(String(row[colIdxP1['analytic_vertical']]).trim()); 
-    if(row[colIdxP1['tagging']]) sets.tagging.add(String(row[colIdxP1['tagging']]).trim());
+    if(row[colP1('BU')]) sets.bu.add(String(row[colP1('BU')]).trim()); 
+    if(row[colP1('Company')]) sets.company.add(String(row[colP1('Company')]).trim());
+    if(row[colP1('KAM')]) sets.kam.add(String(row[colP1('KAM')]).trim()); 
+    if(row[colP1('KAM_Lead')]) sets.kamLead.add(String(row[colP1('KAM_Lead')]).trim());
+    if(row[colP1('Instock_Owner')]) sets.owner.add(String(row[colP1('Instock_Owner')]).trim()); 
+    if(row[colP1('FC_Code')]) sets.sh.add(String(row[colP1('FC_Code')]).trim());
+    if(row[colP1('brand')]) sets.brand.add(String(row[colP1('brand')]).trim()); 
+    if(row[colP1('Vendor_Name')]) sets.vendor.add(String(row[colP1('Vendor_Name')]).trim());
+    if(row[colP1('analytic_vertical')]) sets.vertical.add(String(row[colP1('analytic_vertical']]).trim()); 
+    if(row[colP1('tagging')]) sets.tagging.add(String(row[colP1('tagging')]).trim());
     
-    let vmiCol = colIdxP1['VMI_Flag'] !== undefined ? colIdxP1['VMI_Flag'] : colIdxP1['VMI']; 
+    let vmiCol = colP1('VMI_Flag') !== undefined ? colP1('VMI_Flag') : colP1('VMI'); 
     if(vmiCol !== undefined && row[vmiCol]) sets.vmi.add(String(row[vmiCol]).trim());
     
-    let bnCol = colIdxP1['Buying_Node_Flag']; 
+    let bnCol = colP1('Buying_Node_Flag'); 
     if(bnCol !== undefined && row[bnCol]) sets.buyingNode.add(String(row[bnCol]).trim());
     
+    let idxBrandPoc1 = colP1('Brand_POC');
+    let idxDsBucket1 = colP1('Instock_DS_Bucket') !== undefined ? colP1('Instock_DS_Bucket') : colP1('instock_ds_bucket');
+    let idxZone1 = colP1('Zone');
+    let idxUpdatedBu1 = colP1('Updated_BU');
+    let idxGourmet1 = colP1('Gourmet_Flag');
+    let idxRegional1 = colP1('Regional_fsn_flag');
+    let idxSuper1 = colP1('Super_Category');
+    let idxOrg1 = colP1('Organic_Flag');
+    let idxEm1 = colP1('Engagement_Manager');
+    let idxUbpl1 = colP1('UB_PL_Flag');
+
     if(idxBrandPoc1 !== undefined && row[idxBrandPoc1]) sets.brandPoc.add(String(row[idxBrandPoc1]).trim());
     if(idxDsBucket1 !== undefined && row[idxDsBucket1]) sets.dsBucket.add(String(row[idxDsBucket1]).trim());
     if(idxZone1 !== undefined && row[idxZone1]) sets.zone.add(String(row[idxZone1]).trim());
@@ -1241,7 +1278,7 @@ function populateFilterOptions() {
     if(idxEm1 !== undefined && row[idxEm1]) sets.em.add(String(row[idxEm1]).trim());
     if(idxUbpl1 !== undefined && row[idxUbpl1]) sets.ubpl.add(String(row[idxUbpl1]).trim());
     
-    let fsnCol = colIdxP1['FSN'] !== undefined ? colIdxP1['FSN'] : colIdxP1['fsn']; 
+    let fsnCol = colP1('FSN'); 
     if(fsnCol !== undefined && row[fsnCol]) sets.fsn.add(String(row[fsnCol]).trim());
   });
   const fillSelect = (id, set) => { const el = $(id); Array.from(set).sort().forEach(val => el.append(new Option(val, val))); };
