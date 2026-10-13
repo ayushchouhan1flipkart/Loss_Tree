@@ -21,7 +21,10 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
-// EXACT UI NAMES FOR REPORTING
+// STANDARD CALCULATION: No artificial caps. Accurate data only.
+const calcPct = (n, d) => d ? (n / d) * 100 : 0;
+
+// EXACT UI COLUMNS
 const LOSS_REMARK_SEQ = {
   "Instock": 0, "NPD": 1, "NO-PO|NO-QOH| NO-IRN": 2, 
   "Not Received 30D(sch)": 3, "Not Received 30D": 4, "ASP Drop": 5, "Network Issue": 6, "Wrong Forecasting": 7, 
@@ -30,15 +33,14 @@ const LOSS_REMARK_SEQ = {
   "IWIT Pendency": 15, "SH-SH IWIT Issue": 16, "Other Loss": 17
 };
 
-// EXTREMELY ROBUST COLUMN FETCHER: Ignores spaces, underscores, and capitals to completely prevent the >100% bug on old files
-const colP1 = (name) => {
-    let target = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    for (let k in colIdxP1) if (k.toLowerCase().replace(/[^a-z0-9]/g, '') === target) return colIdxP1[k];
-    return undefined;
-};
-const colP2 = (name) => {
-    let target = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    for (let k in colIdxP2) if (k.toLowerCase().replace(/[^a-z0-9]/g, '') === target) return colIdxP2[k];
+// ROBUST COLUMN FINDER: Handles missing or renamed columns gracefully
+const findCol = (colsObj, namesArray) => {
+    for (let n of namesArray) {
+        let target = n.toLowerCase().replace(/[^a-z0-9]/g, '');
+        for (let k in colsObj) {
+            if (k.toLowerCase().replace(/[^a-z0-9]/g, '') === target) return colsObj[k];
+        }
+    }
     return undefined;
 };
 
@@ -150,6 +152,7 @@ function downloadCSVsFromDrive(config) {
       let data2 = [];
       let baseHeaders = [];
       
+      // DYNAMIC COLUMN PICKER: Forces matching of columns across historical splits
       data2Array.forEach((chunkData, index) => {
         if (chunkData && chunkData.length > 0) {
           if (index === 0) {
@@ -202,8 +205,8 @@ function initDashboardFromClient(d1, d2) {
     
     rawDataP1 = d1;
     
-    const dateColIdx = colP2('Report_Date');
-    if (dateColIdx > -1) {
+    const dateColIdx = findCol(colIdxP2, ['Report_Date']);
+    if (dateColIdx !== undefined) {
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       d2 = d2.map(row => {
         if(row[dateColIdx]) {
@@ -215,14 +218,16 @@ function initDashboardFromClient(d1, d2) {
     }
     
     rawDataP2 = d2;
-    GLOBAL_DATES = [...new Set(rawDataP2.map(r => String(r[dateColIdx] || 'Unknown')))];
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    GLOBAL_DATES.sort((a, b) => {
-        if (a === 'Unknown') return -1; if (b === 'Unknown') return 1;
-        let pA = a.split(' '), pB = b.split(' ');
-        if (pA.length === 2 && pB.length === 2) return (monthNames.indexOf(pA[1]) * 100 + parseInt(pA[0], 10)) - (monthNames.indexOf(pB[1]) * 100 + parseInt(pB[0], 10));
-        return a.localeCompare(b);
-    });
+    if(dateColIdx !== undefined) {
+        GLOBAL_DATES = [...new Set(rawDataP2.map(r => String(r[dateColIdx] || 'Unknown')))];
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        GLOBAL_DATES.sort((a, b) => {
+            if (a === 'Unknown') return -1; if (b === 'Unknown') return 1;
+            let pA = a.split(' '), pB = b.split(' ');
+            if (pA.length === 2 && pB.length === 2) return (monthNames.indexOf(pA[1]) * 100 + parseInt(pA[0], 10)) - (monthNames.indexOf(pB[1]) * 100 + parseInt(pB[0], 10));
+            return a.localeCompare(b);
+        });
+    }
     populateFilterOptions(); triggerFilterLogic(); 
   } catch(e) { console.error("Init Error:", e); }
 }
@@ -367,21 +372,12 @@ function aggregateAllDataInMemory() {
     organic: new Set($('#filter-organic').val() || []), em: new Set($('#filter-em').val() || []), ubpl: new Set($('#filter-ubpl').val() || [])
   };
 
-  let idxBU1 = colP1('BU'), idxComp1 = colP1('Company'), idxKam1 = colP1('KAM'), idxLead1 = colP1('KAM_Lead'), idxOwner1 = colP1('Instock_Owner');
-  let idxSH1 = colP1('FC_Code'), idxBrand1 = colP1('brand'), idxVendor1 = colP1('Vendor_Name'), idxVert1 = colP1('analytic_vertical'), idxTag1 = colP1('tagging');
-  let idxVmi1 = colP1('VMI_Flag') !== undefined ? colP1('VMI_Flag') : colP1('VMI');
-  let idxBrandPoc1 = colP1('brand_poc');
-  let idxFsn1 = colP1('FSN');
-  let idxBuyNode1 = colP1('Buying_Node_Flag');
-  let idxDsBucket1 = colP1('Instock_DS_Bucket') !== undefined ? colP1('Instock_DS_Bucket') : colP1('instock_ds_bucket');
-  let idxZone1 = colP1('Zone');
-  let idxUpdatedBu1 = colP1('Updated_BU');
-  let idxGourmet1 = colP1('Gourmet_Flag');
-  let idxRegional1 = colP1('Regional_fsn_flag');
-  let idxSuper1 = colP1('Super_Category');
-  let idxOrg1 = colP1('Organic_Flag');
-  let idxEm1 = colP1('Engagement_Manager');
-  let idxUbpl1 = colP1('UB_PL_Flag');
+  let idxBU1 = findCol(colIdxP1, ['BU']); let idxComp1 = findCol(colIdxP1, ['Company']); let idxKam1 = findCol(colIdxP1, ['KAM']); let idxLead1 = findCol(colIdxP1, ['KAM_Lead']); let idxOwner1 = findCol(colIdxP1, ['Instock_Owner']);
+  let idxSH1 = findCol(colIdxP1, ['FC_Code']); let idxBrand1 = findCol(colIdxP1, ['brand']); let idxVendor1 = findCol(colIdxP1, ['Vendor_Name']); let idxVert1 = findCol(colIdxP1, ['analytic_vertical']); let idxTag1 = findCol(colIdxP1, ['tagging']);
+  let idxVmi1 = findCol(colIdxP1, ['VMI_Flag', 'vmi']); let idxBrandPoc1 = findCol(colIdxP1, ['brand_poc', 'brandpoc']); let idxFsn1 = findCol(colIdxP1, ['FSN', 'fsn']);
+  let idxBuyNode1 = findCol(colIdxP1, ['Buying_Node_Flag']); let idxDsBucket1 = findCol(colIdxP1, ['Instock_DS_Bucket', 'instockdsbucket']); let idxZone1 = findCol(colIdxP1, ['Zone']);
+  let idxUpdatedBu1 = findCol(colIdxP1, ['Updated_BU']); let idxGourmet1 = findCol(colIdxP1, ['Gourmet_Flag', 'gourmet']); let idxRegional1 = findCol(colIdxP1, ['Regional_fsn_flag', 'regionalfsn']);
+  let idxSuper1 = findCol(colIdxP1, ['Super_Category', 'supercategory']); let idxOrg1 = findCol(colIdxP1, ['Organic_Flag', 'organic']); let idxEm1 = findCol(colIdxP1, ['Engagement_Manager', 'engagementmanager']); let idxUbpl1 = findCol(colIdxP1, ['UB_PL_Flag', 'ubpl']);
 
   activeFilteredP1 = rawDataP1.filter(row => {
     let buyNode = idxBuyNode1 !== undefined ? String(row[idxBuyNode1] || '').trim().toLowerCase() : 'yes';
@@ -413,21 +409,12 @@ function aggregateAllDataInMemory() {
     return true;
   });
 
-  let idxBU2 = colP2('BU'), idxComp2 = colP2('Company'), idxKam2 = colP2('KAM'), idxLead2 = colP2('KAM_Lead'), idxOwner2 = colP2('Instock_Owner');
-  let idxSH2 = colP2('FC_Code'), idxBrand2 = colP2('brand'), idxVendor2 = colP2('Vendor_Name'), idxVert2 = colP2('analytic_vertical'), idxTag2 = colP2('tagging');
-  let idxVmi2 = colP2('VMI_Flag') !== undefined ? colP2('VMI_Flag') : colP2('vmi');
-  let idxBrandPoc2 = colP2('brand_poc');
-  let idxFsn2 = colP2('FSN');
-  let idxBuyNode2 = colP2('Buying_Node_Flag');
-  let idxDsBucket2 = colP2('Instock_DS_Bucket') !== undefined ? colP2('Instock_DS_Bucket') : colP2('instock_ds_bucket');
-  let idxZone2 = colP2('Zone');
-  let idxUpdatedBu2 = colP2('Updated_BU');
-  let idxGourmet2 = colP2('Gourmet_Flag');
-  let idxRegional2 = colP2('Regional_fsn_flag');
-  let idxSuper2 = colP2('Super_Category');
-  let idxOrg2 = colP2('Organic_Flag');
-  let idxEm2 = colP2('Engagement_Manager');
-  let idxUbpl2 = colP2('UB_PL_Flag');
+  let idxBU2 = findCol(colIdxP2, ['BU']), idxComp2 = findCol(colIdxP2, ['Company']), idxKam2 = findCol(colIdxP2, ['KAM']), idxLead2 = findCol(colIdxP2, ['KAM_Lead']), idxOwner2 = findCol(colIdxP2, ['Instock_Owner']);
+  let idxSH2 = findCol(colIdxP2, ['FC_Code']), idxBrand2 = findCol(colIdxP2, ['brand']), idxVendor2 = findCol(colIdxP2, ['Vendor_Name']), idxVert2 = findCol(colIdxP2, ['analytic_vertical']), idxTag2 = findCol(colIdxP2, ['tagging']);
+  let idxVmi2 = findCol(colIdxP2, ['VMI_Flag', 'vmi']), idxBrandPoc2 = findCol(colIdxP2, ['brand_poc', 'brandpoc']), idxFsn2 = findCol(colIdxP2, ['FSN', 'fsn']), idxBuyNode2 = findCol(colIdxP2, ['Buying_Node_Flag']);
+  let idxDsBucket2 = findCol(colIdxP2, ['Instock_DS_Bucket', 'instockdsbucket']), idxZone2 = findCol(colIdxP2, ['Zone']);
+  let idxUpdatedBu2 = findCol(colIdxP2, ['Updated_BU']), idxGourmet2 = findCol(colIdxP2, ['Gourmet_Flag', 'gourmet']), idxRegional2 = findCol(colIdxP2, ['Regional_fsn_flag', 'regionalfsn']);
+  let idxSuper2 = findCol(colIdxP2, ['Super_Category', 'supercategory']), idxOrg2 = findCol(colIdxP2, ['Organic_Flag', 'organic']), idxEm2 = findCol(colIdxP2, ['Engagement_Manager', 'engagementmanager']), idxUbpl2 = findCol(colIdxP2, ['UB_PL_Flag', 'ubpl']);
 
   activeFilteredP2 = rawDataP2.filter(row => {
     let buyNode = idxBuyNode2 !== undefined ? String(row[idxBuyNode2] || '').trim().toLowerCase() : 'yes';
@@ -508,31 +495,15 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
     let gt = { fsn: 0, atp: 0, qoh: 0, openPo: 0, fdrr: 0, sdrr: 0, dsInstock: 0, dsTotal: 0, shInstock: 0, shSch: 0, shPo: 0, mstnAtp: 0, mstnSch: 0, mstnPo: 0, norm: 0, iwit: 0, irn: 0, dsMstn: 0, dsMstnIt: 0, dsNorm: 0, instockItDs: 0, dsNormRaw: 0 };
 
-    let idxTag = colP1('tagging');
-    let idxZone = colP1('Zone');
-    let idxSH = colP1('FC_Code');
-    let idxFsn = colP1('FSN_Count');
-    let idxAtp = colP1('ATP_Current');
-    let idxQoh = colP1('QOH');
-    let idxOpenPo = colP1('Open_PO');
-    let idxFdrr = colP1('Total_rolled_fdrr');
-    let idxSdrr = colP1('DRR_7D');
-    let idxDsIn = colP1('Instock_DS_Count');
-    let idxDsTot = colP1('Total_DS_Count');
-    let idxMstnAtp = colP1('MSTN_atp');
-    let idxMstnSch = colP1('MSTN_with_scheduling');
-    let idxMstnPo  = colP1('MSTN_with_po');
-    let idxNorm    = colP1('new_norm');
-    let idxDoh = colP1('ATP_DOH_Bucket');
-    let idxSchedDoh = colP1('ATP_Sched_DOH_Bucket');
-    let idxPoDoh = colP1('ATP_PO_DOH_Bucket');
-    let bnIdx = colP1('Buying_Node_Flag');
-    let idxIwit = colP1('SH_DS_IWIT_T_minus_1');
-    let idxIrn = colP1('IRN_T_minus_2');
-    let idxDsMstn = colP1('DS_MSTN');
-    let idxDsMstnIt = colP1('DS_MSTN_IT');
-    let idxDsNorm = colP1('DS_Norm');
-    let idxInstockItDs = colP1('Instock_IT_DS_Count');
+    let idxTag = findCol(colIdxP1, ['tagging']); let idxZone = findCol(colIdxP1, ['Zone']); let idxSH = findCol(colIdxP1, ['FC_Code']);
+    let idxFsn = findCol(colIdxP1, ['FSN_Count']); let idxAtp = findCol(colIdxP1, ['ATP_Current']); let idxQoh = findCol(colIdxP1, ['QOH']);
+    let idxOpenPo = findCol(colIdxP1, ['Open_PO']); let idxFdrr = findCol(colIdxP1, ['Total_rolled_fdrr']); let idxSdrr = findCol(colIdxP1, ['DRR_7D']);
+    let idxDsIn = findCol(colIdxP1, ['Instock_DS_Count']); let idxDsTot = findCol(colIdxP1, ['Total_DS_Count']); let idxMstnAtp = findCol(colIdxP1, ['MSTN_atp']);
+    let idxMstnSch = findCol(colIdxP1, ['MSTN_with_scheduling']); let idxMstnPo  = findCol(colIdxP1, ['MSTN_with_po']); let idxNorm    = findCol(colIdxP1, ['new_norm']);
+    let idxDoh = findCol(colIdxP1, ['ATP_DOH_Bucket']); let idxSchedDoh = findCol(colIdxP1, ['ATP_Sched_DOH_Bucket']); let idxPoDoh = findCol(colIdxP1, ['ATP_PO_DOH_Bucket']);
+    let bnIdx = findCol(colIdxP1, ['Buying_Node_Flag']); let idxIwit = findCol(colIdxP1, ['SH_DS_IWIT_T_minus_1']); let idxIrn = findCol(colIdxP1, ['IRN_T_minus_2']);
+    let idxDsMstn = findCol(colIdxP1, ['DS_MSTN']); let idxDsMstnIt = findCol(colIdxP1, ['DS_MSTN_IT']); let idxDsNorm = findCol(colIdxP1, ['DS_Norm']);
+    let idxInstockItDs = findCol(colIdxP1, ['Instock_IT_DS_Count']);
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
@@ -567,14 +538,12 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       if (!byShTag[shTagKey]) byShTag[shTagKey] = initBucket();
       
       let vFsn = Number(row[idxFsn]) || 0;
-      let vDsIn = Number(row[idxDsIn]) || 0;
-      let vDsTot = Number(row[idxDsTot]) || 0;
-
-      // MATHEMATICAL OVERRIDE TO PREVENT >100%
-      if (vDsIn > vDsTot) vDsTot = vDsIn;
 
       if (isAllowedDS) {
+          let vDsIn = Number(row[idxDsIn]) || 0;
+          let vDsTot = Number(row[idxDsTot]) || 0;
           let vDsMstn = Number(row[idxDsMstn]) || 0, vDsMstnIt = Number(row[idxDsMstnIt]) || 0, vDsNorm = Number(row[idxDsNorm]) || 0, vInstockItDs = Number(row[idxInstockItDs]) || 0;
+          
           let addDsMetrics = (b) => {
               b.dsInstock += vDsIn; b.dsTotal += vDsTot; b.dsMstn += vDsMstn; b.dsMstnIt += vDsMstnIt; b.dsNorm += vDsNorm; b.instockItDs += vInstockItDs; b.dsNormRaw += vDsNorm;
           };
@@ -617,10 +586,10 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
         is_gt: isGT ? 0 : 1, sort_order: sOrd, group: grp, isGrandTotal: isGT, isGroupHeader: isGrpHdr, isChild: isCh, zoneSafe: zSafe,
         fsn: r.fsn, atp: r.atp, qoh: r.qoh, openPo: r.openPo, fdrr: r.fdrr, sdrr: r.sdrr, iwit: r.iwit, irn: r.irn,
         dsNormRaw: r.dsNormRaw,
-        dsPct: r.dsTotal ? ((r.dsInstock / r.dsTotal) * 100) : 0, dsInstockItPct: r.dsTotal ? ((r.instockItDs / r.dsTotal) * 100) : 0,
-        shPct: r.fsn ? ((r.shInstock / r.fsn) * 100) : 0, shSchPct: r.fsn ? ((r.shSch / r.fsn) * 100) : 0, shPoPct: r.fsn ? ((r.shPo / r.fsn) * 100) : 0,
-        dsMstnPct: r.dsNorm ? ((r.dsMstn / r.dsNorm) * 100) : 0, dsMstnItPct: r.dsNorm ? ((r.dsMstnIt / r.dsNorm) * 100) : 0,
-        mstnAtpPct: r.norm ? ((r.mstnAtp / r.norm) * 100) : 0, mstnSchPct: r.norm ? ((r.mstnSch / r.norm) * 100) : 0, mstnPoPct: r.norm ? ((r.mstnPo / r.norm) * 100) : 0
+        dsPct: calcPct(r.dsInstock, r.dsTotal), dsInstockItPct: calcPct(r.instockItDs, r.dsTotal),
+        shPct: calcPct(r.shInstock, r.fsn), shSchPct: calcPct(r.shSch, r.fsn), shPoPct: calcPct(r.shPo, r.fsn),
+        dsMstnPct: calcPct(r.dsMstn, r.dsNorm), dsMstnItPct: calcPct(r.dsMstnIt, r.dsNorm),
+        mstnAtpPct: calcPct(r.mstnAtp, r.norm), mstnSchPct: calcPct(r.mstnSch, r.norm), mstnPoPct: calcPct(r.mstnPo, r.norm)
     });
 
     const t1Data = [];
@@ -707,11 +676,11 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
     let isShLevel = (groupColName === 'SH (FC Code)');
     const byGroup = {}; const shToZone = {}; let grandTotalFsns = 0, grandTotalDSInstock = 0, grandTotalDSTotal = 0; let grandTotalRemarks = {};
     
-    let gColIdx = colP1(groupCol);
-    let rIdx = colP1('Loss_Remark'), fsnIdx = colP1('FSN_Count');
-    let dsiIdx = colP1('Instock_DS_Count'), dstIdx = colP1('Total_DS_Count'), bnIdx = colP1('Buying_Node_Flag');
-    let zIdx = colP1('Zone');
-    let titleIdx = colP1('Title') !== undefined ? colP1('Title') : colP1('Product_Title');
+    let gColIdx = findCol(colIdxP1, [groupCol]);
+    let rIdx = findCol(colIdxP1, ['Loss_Remark']), fsnIdx = findCol(colIdxP1, ['FSN_Count']);
+    let dsiIdx = findCol(colIdxP1, ['Instock_DS_Count']), dstIdx = findCol(colIdxP1, ['Total_DS_Count']), bnIdx = findCol(colIdxP1, ['Buying_Node_Flag']);
+    let zIdx = findCol(colIdxP1, ['Zone']);
+    let titleIdx = findCol(colIdxP1, ['Title', 'Product_Title']);
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
@@ -745,9 +714,6 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
       let dsInstock = Number(row[dsiIdx]) || 0;
       let dsTotal = Number(row[dstIdx]) || 0;
       
-      // MATHEMATICAL OVERRIDE TO PREVENT >100%
-      if (dsInstock > dsTotal) dsTotal = dsInstock;
-      
       const buyNode = bnIdx !== undefined ? String(row[bnIdx] || '').trim().toLowerCase() : 'yes';
       
       let isAllowedSH = false; let isAllowedDS = false;
@@ -761,8 +727,8 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
     const tableData = [];
     if (grandTotalFsns > 0 || grandTotalDSTotal > 0) {
-      let gtRow = { is_gt: 0, group: 'GRAND TOTAL', total: grandTotalFsns, dsInstockPct: grandTotalDSTotal ? ((grandTotalDSInstock / grandTotalDSTotal) * 100) : 0, isGrandTotal: true };
-      Object.keys(LOSS_REMARK_SEQ).forEach(remark => { gtRow[remark] = grandTotalFsns ? ((grandTotalRemarks[remark] / grandTotalFsns) * 100) : 0; }); tableData.push(gtRow);
+      let gtRow = { is_gt: 0, group: 'GRAND TOTAL', total: grandTotalFsns, dsInstockPct: calcPct(grandTotalDSInstock, grandTotalDSTotal), isGrandTotal: true };
+      Object.keys(LOSS_REMARK_SEQ).forEach(remark => { gtRow[remark] = calcPct(grandTotalRemarks[remark], grandTotalFsns); }); tableData.push(gtRow);
     }
 
     if (isShLevel) {
@@ -775,19 +741,19 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
         });
         Object.keys(zoneTotals).sort().forEach(z => {
             let zSafe = z.replace(/[^a-zA-Z0-9]/g, '');
-            let zRow = { is_gt: 1, group: z, total: zoneTotals[z].totalFsns, dsInstockPct: zoneTotals[z].dsTotal ? ((zoneTotals[z].dsInstock / zoneTotals[z].dsTotal)*100) : 0, isGrandTotal: false, isGroupHeader: true, zoneSafe: zSafe };
-            Object.keys(LOSS_REMARK_SEQ).forEach(rem => zRow[rem] = zoneTotals[z].totalFsns ? ((zoneTotals[z].remarks[rem] / zoneTotals[z].totalFsns)*100) : 0); tableData.push(zRow);
+            let zRow = { is_gt: 1, group: z, total: zoneTotals[z].totalFsns, dsInstockPct: calcPct(zoneTotals[z].dsInstock, zoneTotals[z].dsTotal), isGrandTotal: false, isGroupHeader: true, zoneSafe: zSafe };
+            Object.keys(LOSS_REMARK_SEQ).forEach(rem => zRow[rem] = calcPct(zoneTotals[z].remarks[rem], zoneTotals[z].totalFsns)); tableData.push(zRow);
             Object.keys(byGroup).sort().forEach(sh => {
                 if(shToZone[sh] === z) {
-                    let cRow = { is_gt: 1, group: sh, total: byGroup[sh].totalFsns, dsInstockPct: byGroup[sh].dsTotal ? ((byGroup[sh].dsInstock / byGroup[sh].dsTotal)*100) : 0, isGrandTotal: false, isChild: true, zoneSafe: zSafe };
-                    Object.keys(LOSS_REMARK_SEQ).forEach(rem => cRow[rem] = byGroup[sh].totalFsns ? ((byGroup[sh].remarks[rem] / byGroup[sh].totalFsns)*100) : 0); tableData.push(cRow);
+                    let cRow = { is_gt: 1, group: sh, total: byGroup[sh].totalFsns, dsInstockPct: calcPct(byGroup[sh].dsInstock, byGroup[sh].dsTotal), isGrandTotal: false, isChild: true, zoneSafe: zSafe };
+                    Object.keys(LOSS_REMARK_SEQ).forEach(rem => cRow[rem] = calcPct(byGroup[sh].remarks[rem], byGroup[sh].totalFsns)); tableData.push(cRow);
                 }
             });
         });
     } else {
         Object.values(byGroup).forEach(group => {
-          let rowData = { is_gt: 1, group: group.groupKey, total: group.totalFsns, dsInstockPct: group.dsTotal ? ((group.dsInstock / group.dsTotal) * 100) : 0, isGrandTotal: false };
-          Object.keys(LOSS_REMARK_SEQ).forEach(remark => { rowData[remark] = group.totalFsns ? ((group.remarks[remark] / group.totalFsns) * 100) : 0; }); tableData.push(rowData);
+          let rowData = { is_gt: 1, group: group.groupKey, total: group.totalFsns, dsInstockPct: calcPct(group.dsInstock, group.dsTotal), isGrandTotal: false };
+          Object.keys(LOSS_REMARK_SEQ).forEach(remark => { rowData[remark] = calcPct(group.remarks[remark], group.totalFsns); }); tableData.push(rowData);
         });
     }
 
@@ -820,11 +786,11 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     const byGroup = {}; const shToZone = {}; let grandTotalByDate = {};
     uniqueDates.forEach(d => grandTotalByDate[d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 });
 
-    let gColIdx = colP2(groupCol);
-    let rDateIdx = colP2('Report_Date'), remIdx = colP2('Loss_Remark');
-    let buyIdx = colP2('Buying_Node_Flag'), fsnIdx = colP2('FSN_Count'), tdIdx = colP2('Total_DS_Count'), idiIdx = colP2('Instock_DS_Count');
-    let zIdx = colP2('Zone');
-    let titleIdx = colP2('Title') !== undefined ? colP2('Title') : colP2('Product_Title');
+    let gColIdx = findCol(colIdxP2, [groupCol]);
+    let rDateIdx = findCol(colIdxP2, ['Report_Date']), remIdx = findCol(colIdxP2, ['Loss_Remark']);
+    let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']), fsnIdx = findCol(colIdxP2, ['FSN_Count']), tdIdx = findCol(colIdxP2, ['Total_DS_Count']), idiIdx = findCol(colIdxP2, ['Instock_DS_Count']);
+    let zIdx = findCol(colIdxP2, ['Zone']);
+    let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
@@ -843,9 +809,6 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       const countFSN = Number(row[fsnIdx]) || 0;
       let countTotalDS = Number(row[tdIdx]) || 0;
       let countInstockDS = Number(row[idiIdx]) || 0;
-
-      // MATHEMATICAL OVERRIDE TO PREVENT >100%
-      if (countInstockDS > countTotalDS) countTotalDS = countInstockDS;
 
       let isAllowedSH = false; let isAllowedDS = false;
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; } 
@@ -870,10 +833,9 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     gtRow['latestDSLoss'] = latestDate ? (grandTotalByDate[latestDate].dsTotal - grandTotalByDate[latestDate].dsInstock) : 0;
 
     uniqueDates.forEach(d => {
-      let gtSHTotal = grandTotalByDate[d].shTotal, gtDSTotal = grandTotalByDate[d].dsTotal;
-      if(gtSHTotal > 0 || gtDSTotal > 0) gtHasData = true;
-      gtRow[d + '_sh'] = gtSHTotal ? ((grandTotalByDate[d].shInstock / gtSHTotal) * 100) : 0;
-      gtRow[d + '_ds'] = gtDSTotal ? ((grandTotalByDate[d].dsInstock / gtDSTotal) * 100) : 0;
+      if(grandTotalByDate[d].shTotal > 0 || grandTotalByDate[d].dsTotal > 0) gtHasData = true;
+      gtRow[d + '_sh'] = calcPct(grandTotalByDate[d].shInstock, grandTotalByDate[d].shTotal);
+      gtRow[d + '_ds'] = calcPct(grandTotalByDate[d].dsInstock, grandTotalByDate[d].dsTotal);
     });
     if(gtHasData) tableData.push(gtRow);
 
@@ -887,12 +849,12 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
         Object.keys(zoneTotals).sort().forEach(z => {
             let zSafe = z.replace(/[^a-zA-Z0-9]/g, '');
             let zRow = { is_gt: 1, group: z, isGrandTotal: false, isGroupHeader: true, zoneSafe: zSafe, latestTotalFSNs: latestDate ? zoneTotals[z][latestDate].shTotal : 0, latestDSLoss: latestDate ? (zoneTotals[z][latestDate].dsTotal - zoneTotals[z][latestDate].dsInstock) : 0 };
-            uniqueDates.forEach(d => { zRow[d+'_sh'] = zoneTotals[z][d].shTotal ? ((zoneTotals[z][d].shInstock / zoneTotals[z][d].shTotal)*100) : 0; zRow[d+'_ds'] = zoneTotals[z][d].dsTotal ? ((zoneTotals[z][d].dsInstock / zoneTotals[z][d].dsTotal)*100) : 0; });
+            uniqueDates.forEach(d => { zRow[d+'_sh'] = calcPct(zoneTotals[z][d].shInstock, zoneTotals[z][d].shTotal); zRow[d+'_ds'] = calcPct(zoneTotals[z][d].dsInstock, zoneTotals[z][d].dsTotal); });
             tableData.push(zRow);
             Object.keys(byGroup).sort().forEach(sh => {
                 if(shToZone[sh] === z) {
                     let cRow = { is_gt: 1, group: sh, isGrandTotal: false, isChild: true, zoneSafe: zSafe, latestTotalFSNs: latestDate ? byGroup[sh][latestDate].shTotal : 0, latestDSLoss: latestDate ? (byGroup[sh][latestDate].dsTotal - byGroup[sh][latestDate].dsInstock) : 0 };
-                    uniqueDates.forEach(d => { cRow[d+'_sh'] = byGroup[sh][d].shTotal ? ((byGroup[sh][d].shInstock / byGroup[sh][d].shTotal)*100) : 0; cRow[d+'_ds'] = byGroup[sh][d].dsTotal ? ((byGroup[sh][d].dsInstock / byGroup[sh][d].dsTotal)*100) : 0; });
+                    uniqueDates.forEach(d => { cRow[d+'_sh'] = calcPct(byGroup[sh][d].shInstock, byGroup[sh][d].shTotal); cRow[d+'_ds'] = calcPct(byGroup[sh][d].dsInstock, byGroup[sh][d].dsTotal); });
                     tableData.push(cRow);
                 }
             });
@@ -904,10 +866,9 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
           rowData['latestDSLoss'] = latestDate ? (groupObj[latestDate].dsTotal - groupObj[latestDate].dsInstock) : 0;
 
           uniqueDates.forEach(d => {
-            let daySHTotal = groupObj[d].shTotal, dayDSTotal = groupObj[d].dsTotal;
-            if (daySHTotal > 0 || dayDSTotal > 0) rowHasData = true;
-            rowData[d + '_sh'] = daySHTotal ? ((groupObj[d].shInstock / daySHTotal) * 100) : 0;
-            rowData[d + '_ds'] = dayDSTotal ? ((groupObj[d].dsInstock / dayDSTotal) * 100) : 0;
+            if (groupObj[d].shTotal > 0 || groupObj[d].dsTotal > 0) rowHasData = true;
+            rowData[d + '_sh'] = calcPct(groupObj[d].shInstock, groupObj[d].shTotal);
+            rowData[d + '_ds'] = calcPct(groupObj[d].dsInstock, groupObj[d].dsTotal);
           });
           if(rowHasData) tableData.push(rowData);
         });
@@ -961,17 +922,17 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     
     uniqueDates.forEach(d => grandTotalByDate[d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 });
 
-    let gColIdx = colP2(groupCol);
-    let rDateIdx = colP2('Report_Date');
-    let buyIdx = colP2('Buying_Node_Flag');
-    let fsnIdx = colP2('FSN_Count');
-    let zIdx = colP2('Zone');
-    let titleIdx = colP2('Title') !== undefined ? colP2('Title') : colP2('Product_Title');
+    let gColIdx = findCol(colIdxP2, [groupCol]);
+    let rDateIdx = findCol(colIdxP2, ['Report_Date']);
+    let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']);
+    let fsnIdx = findCol(colIdxP2, ['FSN_Count']);
+    let zIdx = findCol(colIdxP2, ['Zone']);
+    let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
     
-    let idxMstnAtp = colP2('MSTN_atp');
-    let idxMstnSch = colP2('MSTN_with_scheduling');
-    let idxMstnPo  = colP2('MSTN_with_po');
-    let idxNorm    = colP2('new_norm');
+    let idxMstnAtp = findCol(colIdxP2, ['MSTN_atp']);
+    let idxMstnSch = findCol(colIdxP2, ['MSTN_with_scheduling']);
+    let idxMstnPo  = findCol(colIdxP2, ['MSTN_with_po']);
+    let idxNorm    = findCol(colIdxP2, ['new_norm']);
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
@@ -1002,10 +963,6 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
           let valAtp = Number(row[idxMstnAtp]) || 0, valSch = Number(row[idxMstnSch]) || 0, valPo  = Number(row[idxMstnPo]) || 0;
           let valNorm = Number(row[idxNorm]) || 0;
 
-          if (valAtp > valNorm) valNorm = valAtp;
-          if (valSch > valNorm) valNorm = valSch;
-          if (valPo > valNorm) valNorm = valPo;
-
           byGroup[finalGroupKey][reportDate].atp += valAtp; byGroup[finalGroupKey][reportDate].sch += valSch; byGroup[finalGroupKey][reportDate].po += valPo; byGroup[finalGroupKey][reportDate].norm += valNorm; byGroup[finalGroupKey][reportDate].shTotal += countFSN;
           grandTotalByDate[reportDate].atp += valAtp; grandTotalByDate[reportDate].sch += valSch; grandTotalByDate[reportDate].po += valPo; grandTotalByDate[reportDate].norm += valNorm; grandTotalByDate[reportDate].shTotal += countFSN;
       }
@@ -1018,11 +975,10 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     gtRow['latestTotalFSNs'] = latestDate ? grandTotalByDate[latestDate].shTotal : 0;
 
     uniqueDates.forEach(d => {
-      let gtNorm = grandTotalByDate[d].norm;
-      if(gtNorm > 0) gtHasData = true;
-      gtRow[d + '_atp'] = gtNorm ? ((grandTotalByDate[d].atp / gtNorm) * 100) : 0;
-      gtRow[d + '_sch'] = gtNorm ? ((grandTotalByDate[d].sch / gtNorm) * 100) : 0;
-      gtRow[d + '_po']  = gtNorm ? ((grandTotalByDate[d].po / gtNorm) * 100) : 0;
+      if(grandTotalByDate[d].norm > 0) gtHasData = true;
+      gtRow[d + '_atp'] = calcPct(grandTotalByDate[d].atp, grandTotalByDate[d].norm);
+      gtRow[d + '_sch'] = calcPct(grandTotalByDate[d].sch, grandTotalByDate[d].norm);
+      gtRow[d + '_po']  = calcPct(grandTotalByDate[d].po, grandTotalByDate[d].norm);
     });
     if(gtHasData) tableData.push(gtRow);
 
@@ -1036,12 +992,12 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
         Object.keys(zoneTotals).sort().forEach(z => {
             let zSafe = z.replace(/[^a-zA-Z0-9]/g, '');
             let zRow = { is_gt: 1, group: z, isGrandTotal: false, isGroupHeader: true, zoneSafe: zSafe, latestTotalFSNs: latestDate ? zoneTotals[z][latestDate].shTotal : 0 };
-            uniqueDates.forEach(d => { zRow[d+'_atp'] = zoneTotals[z][d].norm ? ((zoneTotals[z][d].atp / zoneTotals[z][d].norm)*100) : 0; zRow[d+'_sch'] = zoneTotals[z][d].norm ? ((zoneTotals[z][d].sch / zoneTotals[z][d].norm)*100) : 0; zRow[d+'_po'] = zoneTotals[z][d].norm ? ((zoneTotals[z][d].po / zoneTotals[z][d].norm)*100) : 0; });
+            uniqueDates.forEach(d => { zRow[d+'_atp'] = calcPct(zoneTotals[z][d].atp, zoneTotals[z][d].norm); zRow[d+'_sch'] = calcPct(zoneTotals[z][d].sch, zoneTotals[z][d].norm); zRow[d+'_po'] = calcPct(zoneTotals[z][d].po, zoneTotals[z][d].norm); });
             tableData.push(zRow);
             Object.keys(byGroup).sort().forEach(sh => {
                 if(shToZone[sh] === z) {
                     let cRow = { is_gt: 1, group: sh, isGrandTotal: false, isChild: true, zoneSafe: zSafe, latestTotalFSNs: latestDate ? byGroup[sh][latestDate].shTotal : 0 };
-                    uniqueDates.forEach(d => { cRow[d+'_atp'] = byGroup[sh][d].norm ? ((byGroup[sh][d].atp / byGroup[sh][d].norm)*100) : 0; cRow[d+'_sch'] = byGroup[sh][d].norm ? ((byGroup[sh][d].sch / byGroup[sh][d].norm)*100) : 0; cRow[d+'_po'] = byGroup[sh][d].norm ? ((byGroup[sh][d].po / byGroup[sh][d].norm)*100) : 0; });
+                    uniqueDates.forEach(d => { cRow[d+'_atp'] = calcPct(byGroup[sh][d].atp, byGroup[sh][d].norm); cRow[d+'_sch'] = calcPct(byGroup[sh][d].sch, byGroup[sh][d].norm); cRow[d+'_po'] = calcPct(byGroup[sh][d].po, byGroup[sh][d].norm); });
                     tableData.push(cRow);
                 }
             });
@@ -1052,11 +1008,10 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
           rowData['latestTotalFSNs'] = latestDate ? groupObj[latestDate].shTotal : 0;
 
           uniqueDates.forEach(d => {
-            let dayNorm = groupObj[d].norm;
-            if (dayNorm > 0) rowHasData = true;
-            rowData[d + '_atp'] = dayNorm ? ((groupObj[d].atp / dayNorm) * 100) : 0;
-            rowData[d + '_sch'] = dayNorm ? ((groupObj[d].sch / dayNorm) * 100) : 0;
-            rowData[d + '_po']  = dayNorm ? ((groupObj[d].po / dayNorm) * 100) : 0;
+            if (groupObj[d].norm > 0) rowHasData = true;
+            rowData[d + '_atp'] = calcPct(groupObj[d].atp, groupObj[d].norm);
+            rowData[d + '_sch'] = calcPct(groupObj[d].sch, groupObj[d].norm);
+            rowData[d + '_po']  = calcPct(groupObj[d].po, groupObj[d].norm);
           });
           if(rowHasData) tableData.push(rowData);
         });
@@ -1096,7 +1051,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
 }
 
 function exportRawCSV() {
-  let csvDataRows = []; let buyNodeColP1 = colP1('Buying_Node_Flag');
+  let csvDataRows = []; let buyNodeColP1 = findCol(colIdxP1, ['Buying_Node_Flag']);
   let bnFiltersRaw = $('#filter-buying-node').val() || [];
   let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
 
@@ -1104,9 +1059,9 @@ function exportRawCSV() {
 
   if (currentPage === 'p1') {
     const byGroup = {};
-    let zIdx = colP1('Zone');
+    let zIdx = findCol(colIdxP1, ['Zone']);
     let isShLevel = (activeTabCol === 'FC_Code');
-    let titleIdx = colP1('Title') !== undefined ? colP1('Title') : colP1('Product_Title');
+    let titleIdx = findCol(colIdxP1, ['Title', 'Product_Title']);
 
     activeFilteredP1.forEach(row => {
       let groupKey = (row[colIdxP1[activeTabCol]] || 'Unknown').toString().trim();
@@ -1118,7 +1073,7 @@ function exportRawCSV() {
 
       if (isShLevel && zIdx !== undefined) { let zName = (row[zIdx] || 'Unassigned').toString().trim(); finalGroupKey = zName + " | " + finalGroupKey; }
       
-      const rawRemark = String(row[colP1('Loss_Remark')] || '').trim().toLowerCase();
+      const rawRemark = String(row[findCol(colIdxP1, ['Loss_Remark'])] || '').trim().toLowerCase();
       let remark = 'Other Loss';
       
       if (rawRemark === 'asp drop' || rawRemark === 'asp_drop') {
@@ -1131,7 +1086,7 @@ function exportRawCSV() {
           }
       }
 
-      const fsns = Number(row[colP1('FSN_Count')]) || 0, dsInstock = Number(row[colP1('Instock_DS_Count')]) || 0, dsTotal = Number(row[colP1('Total_DS_Count')]) || 0;
+      const fsns = Number(row[findCol(colIdxP1, ['FSN_Count'])]) || 0, dsInstock = Number(row[findCol(colIdxP1, ['Instock_DS_Count'])]) || 0, dsTotal = Number(row[findCol(colIdxP1, ['Total_DS_Count'])]) || 0;
       const buyNode = buyNodeColP1 !== undefined ? (row[buyNodeColP1] || '').toString().trim().toLowerCase() : 'yes';
       
       let isAllowedSH = false; let isAllowedDS = false;
@@ -1149,18 +1104,18 @@ function exportRawCSV() {
     csvDataRows.push(headerArr.map(h => `"${h}"`).join(","));
 
     Object.keys(byGroup).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
-      let dsPct = byGroup[group].dsTotal ? ((byGroup[group].dsInstock / byGroup[group].dsTotal) * 100).toFixed(1) + "%" : "0.0%";
+      let dsPct = calcPct(byGroup[group].dsInstock, byGroup[group].dsTotal).toFixed(1) + "%";
       let rowArr = [`"${group.replace(/"/g, '""')}"`, byGroup[group].total, dsPct, byGroup[group].dsInstock, byGroup[group].dsTotal];
-      sortedRemarks.forEach(rem => rowArr.push(byGroup[group][rem])); csvDataRows.push(rowArr.join(","));
+      sortedRemarks.forEach(rem => rowArr.push(calcPct(byGroup[group][rem], byGroup[group].total).toFixed(1) + "%")); csvDataRows.push(rowArr.join(","));
     });
   } else if (currentPage === 'p2') {
     const uniqueDates = GLOBAL_DATES;
     const byGroup = {}; const latestDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
-    let buyIdx = colP2('Buying_Node_Flag'); let zIdx = colP2('Zone'); let isShLevel = (activeTabCol === 'FC_Code');
-    let titleIdx = colP2('Title') !== undefined ? colP2('Title') : colP2('Product_Title');
+    let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']); let zIdx = findCol(colIdxP2, ['Zone']); let isShLevel = (activeTabCol === 'FC_Code');
+    let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
 
     activeFilteredP2.forEach(row => {
-      let groupKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[colP2('Report_Date')] || 'Unknown');
+      let groupKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[findCol(colIdxP2, ['Report_Date'])] || 'Unknown');
       
       let finalGroupKey = groupKey;
       if (activeTabName === 'FSN' && titleIdx !== undefined) {
@@ -1169,8 +1124,8 @@ function exportRawCSV() {
 
       if (isShLevel && zIdx !== undefined) { let zName = (row[zIdx] || 'Unassigned').toString().trim(); finalGroupKey = zName + " | " + finalGroupKey; }
 
-      const remark = String(row[colP2('Loss_Remark')] || '').trim().toLowerCase(), buyNode = String(row[buyIdx] || '').trim().toLowerCase();
-      const countFSN = Number(row[colP2('FSN_Count')]) || 0, countTotalDS = Number(row[colP2('Total_DS_Count')]) || 0, countInstockDS = Number(row[colP2('Instock_DS_Count')]) || 0;
+      const remark = String(row[findCol(colIdxP2, ['Loss_Remark'])] || '').trim().toLowerCase(), buyNode = String(row[buyIdx] || '').trim().toLowerCase();
+      const countFSN = Number(row[findCol(colIdxP2, ['FSN_Count'])]) || 0, countTotalDS = Number(row[findCol(colIdxP2, ['Total_DS_Count'])]) || 0, countInstockDS = Number(row[findCol(colIdxP2, ['Instock_DS_Count'])]) || 0;
       
       let isAllowedSH = false; let isAllowedDS = false;
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; }
@@ -1194,12 +1149,12 @@ function exportRawCSV() {
     });
   } else {
     const latestDate = GLOBAL_DATES.length > 0 ? GLOBAL_DATES[GLOBAL_DATES.length - 1] : null; const uniqueDates = [...GLOBAL_DATES].reverse();
-    const byGroup = {}; let buyIdx = colP2('Buying_Node_Flag'); let zIdx = colP2('Zone'); let isShLevel = (activeTabCol === 'FC_Code');
-    let idxMstnAtp = colP2('MSTN_atp'); let idxMstnSch = colP2('MSTN_with_scheduling'); let idxMstnPo  = colP2('MSTN_with_po'); let idxNorm    = colP2('new_norm'); let fsnIdx     = colP2('FSN_Count');
-    let titleIdx = colP2('Title') !== undefined ? colP2('Title') : colP2('Product_Title');
+    const byGroup = {}; let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']); let zIdx = findCol(colIdxP2, ['Zone']); let isShLevel = (activeTabCol === 'FC_Code');
+    let idxMstnAtp = findCol(colIdxP2, ['MSTN_atp']); let idxMstnSch = findCol(colIdxP2, ['MSTN_with_scheduling']); let idxMstnPo  = findCol(colIdxP2, ['MSTN_with_po']); let idxNorm = findCol(colIdxP2, ['new_norm']); let fsnIdx = findCol(colIdxP2, ['FSN_Count']);
+    let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
 
     activeFilteredP2.forEach(row => {
-      let groupKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[colP2('Report_Date')] || 'Unknown');
+      let groupKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[findCol(colIdxP2, ['Report_Date'])] || 'Unknown');
       
       let finalGroupKey = groupKey;
       if (activeTabName === 'FSN' && titleIdx !== undefined) {
@@ -1223,7 +1178,7 @@ function exportRawCSV() {
 
     Object.keys(byGroup).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
       let latestFSN = latestDate ? byGroup[group][latestDate].shTotal : 0; let rowArr = [`"${group.replace(/"/g, '""')}"`, latestFSN];
-      uniqueDates.forEach(d => { let dNorm = byGroup[group][d].norm; rowArr.push(dNorm ? ((byGroup[group][d].atp / dNorm) * 100).toFixed(1) + "%" : "0.0%"); rowArr.push(dNorm ? ((byGroup[group][d].sch / dNorm) * 100).toFixed(1) + "%" : "0.0%"); rowArr.push(dNorm ? ((byGroup[group][d].po / dNorm) * 100).toFixed(1) + "%" : "0.0%"); });
+      uniqueDates.forEach(d => { let dNorm = byGroup[group][d].norm; rowArr.push(calcPct(byGroup[group][d].atp, dNorm).toFixed(1) + "%"); rowArr.push(calcPct(byGroup[group][d].sch, dNorm).toFixed(1) + "%"); rowArr.push(calcPct(byGroup[group][d].po, dNorm).toFixed(1) + "%"); });
       csvDataRows.push(rowArr.join(","));
     });
   }
@@ -1237,35 +1192,35 @@ function exportRawCSV() {
 function populateFilterOptions() {
   let sets = { bu: new Set(), company: new Set(), kam: new Set(), kamLead: new Set(), owner: new Set(), sh: new Set(), brand: new Set(), vendor: new Set(), vertical: new Set(), supercategory: new Set(), tagging: new Set(), vmi: new Set(), buyingNode: new Set(), brandPoc: new Set(), fsn: new Set(), dsBucket: new Set(), zone: new Set(), updatedBu: new Set(), gourmet: new Set(), regional: new Set(), organic: new Set(), em: new Set(), ubpl: new Set() };
   
+  let idxBrandPoc1 = findCol(colIdxP1, ['brand_poc', 'brandpoc']);
+  let idxDsBucket1 = findCol(colIdxP1, ['Instock_DS_Bucket', 'instockdsbucket']);
+  let idxZone1 = findCol(colIdxP1, ['Zone']);
+  let idxUpdatedBu1 = findCol(colIdxP1, ['Updated_BU']);
+  let idxGourmet1 = findCol(colIdxP1, ['Gourmet_Flag', 'gourmet']);
+  let idxRegional1 = findCol(colIdxP1, ['Regional_fsn_flag', 'regionalfsn']);
+  let idxSuper1 = findCol(colIdxP1, ['Super_Category', 'supercategory']);
+  let idxOrg1 = findCol(colIdxP1, ['Organic_Flag', 'organic']);
+  let idxEm1 = findCol(colIdxP1, ['Engagement_Manager', 'engagementmanager']);
+  let idxUbpl1 = findCol(colIdxP1, ['UB_PL_Flag', 'ubpl', 'ub_pl']);
+
   rawDataP1.forEach(row => {
-    if(row[colP1('BU')]) sets.bu.add(String(row[colP1('BU')]).trim()); 
-    if(row[colP1('Company')]) sets.company.add(String(row[colP1('Company')]).trim());
-    if(row[colP1('KAM')]) sets.kam.add(String(row[colP1('KAM')]).trim()); 
-    if(row[colP1('KAM_Lead')]) sets.kamLead.add(String(row[colP1('KAM_Lead')]).trim());
-    if(row[colP1('Instock_Owner')]) sets.owner.add(String(row[colP1('Instock_Owner')]).trim()); 
-    if(row[colP1('FC_Code')]) sets.sh.add(String(row[colP1('FC_Code')]).trim());
-    if(row[colP1('brand')]) sets.brand.add(String(row[colP1('brand')]).trim()); 
-    if(row[colP1('Vendor_Name')]) sets.vendor.add(String(row[colP1('Vendor_Name')]).trim());
-    if(row[colP1('analytic_vertical')]) sets.vertical.add(String(row[colP1('analytic_vertical']]).trim()); 
-    if(row[colP1('tagging')]) sets.tagging.add(String(row[colP1('tagging')]).trim());
+    if(row[findCol(colIdxP1, ['BU'])]) sets.bu.add(String(row[findCol(colIdxP1, ['BU'])]).trim()); 
+    if(row[findCol(colIdxP1, ['Company'])]) sets.company.add(String(row[findCol(colIdxP1, ['Company'])]).trim());
+    if(row[findCol(colIdxP1, ['KAM'])]) sets.kam.add(String(row[findCol(colIdxP1, ['KAM'])]).trim()); 
+    if(row[findCol(colIdxP1, ['KAM_Lead'])]) sets.kamLead.add(String(row[findCol(colIdxP1, ['KAM_Lead'])]).trim());
+    if(row[findCol(colIdxP1, ['Instock_Owner'])]) sets.owner.add(String(row[findCol(colIdxP1, ['Instock_Owner'])]).trim()); 
+    if(row[findCol(colIdxP1, ['FC_Code'])]) sets.sh.add(String(row[findCol(colIdxP1, ['FC_Code'])]).trim());
+    if(row[findCol(colIdxP1, ['brand'])]) sets.brand.add(String(row[findCol(colIdxP1, ['brand'])]).trim()); 
+    if(row[findCol(colIdxP1, ['Vendor_Name'])]) sets.vendor.add(String(row[findCol(colIdxP1, ['Vendor_Name'])]).trim());
+    if(row[findCol(colIdxP1, ['analytic_vertical'])]) sets.vertical.add(String(row[findCol(colIdxP1, ['analytic_vertical'])]).trim()); 
+    if(row[findCol(colIdxP1, ['tagging'])]) sets.tagging.add(String(row[findCol(colIdxP1, ['tagging'])]).trim());
     
-    let vmiCol = colP1('VMI_Flag') !== undefined ? colP1('VMI_Flag') : colP1('VMI'); 
+    let vmiCol = findCol(colIdxP1, ['VMI_Flag', 'vmi']); 
     if(vmiCol !== undefined && row[vmiCol]) sets.vmi.add(String(row[vmiCol]).trim());
     
-    let bnCol = colP1('Buying_Node_Flag'); 
+    let bnCol = findCol(colIdxP1, ['Buying_Node_Flag']); 
     if(bnCol !== undefined && row[bnCol]) sets.buyingNode.add(String(row[bnCol]).trim());
     
-    let idxBrandPoc1 = colP1('Brand_POC');
-    let idxDsBucket1 = colP1('Instock_DS_Bucket') !== undefined ? colP1('Instock_DS_Bucket') : colP1('instock_ds_bucket');
-    let idxZone1 = colP1('Zone');
-    let idxUpdatedBu1 = colP1('Updated_BU');
-    let idxGourmet1 = colP1('Gourmet_Flag');
-    let idxRegional1 = colP1('Regional_fsn_flag');
-    let idxSuper1 = colP1('Super_Category');
-    let idxOrg1 = colP1('Organic_Flag');
-    let idxEm1 = colP1('Engagement_Manager');
-    let idxUbpl1 = colP1('UB_PL_Flag');
-
     if(idxBrandPoc1 !== undefined && row[idxBrandPoc1]) sets.brandPoc.add(String(row[idxBrandPoc1]).trim());
     if(idxDsBucket1 !== undefined && row[idxDsBucket1]) sets.dsBucket.add(String(row[idxDsBucket1]).trim());
     if(idxZone1 !== undefined && row[idxZone1]) sets.zone.add(String(row[idxZone1]).trim());
@@ -1278,7 +1233,7 @@ function populateFilterOptions() {
     if(idxEm1 !== undefined && row[idxEm1]) sets.em.add(String(row[idxEm1]).trim());
     if(idxUbpl1 !== undefined && row[idxUbpl1]) sets.ubpl.add(String(row[idxUbpl1]).trim());
     
-    let fsnCol = colP1('FSN'); 
+    let fsnCol = findCol(colIdxP1, ['FSN', 'fsn']); 
     if(fsnCol !== undefined && row[fsnCol]) sets.fsn.add(String(row[fsnCol]).trim());
   });
   const fillSelect = (id, set) => { const el = $(id); Array.from(set).sort().forEach(val => el.append(new Option(val, val))); };
