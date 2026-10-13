@@ -21,19 +21,19 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
-// STANDARD CALCULATION: No artificial caps. Accurate data only.
+// NATURAL PERCENTAGE CALCULATION
 const calcPct = (n, d) => d ? (n / d) * 100 : 0;
 
 // EXACT UI COLUMNS
 const LOSS_REMARK_SEQ = {
   "Instock": 0, "NPD": 1, "NO-PO|NO-QOH| NO-IRN": 2, 
-  "Not Received 30D(sch)": 3, "Not Received 30D": 4, "ASP Drop": 5, "Network Issue": 6, "Wrong Forecasting": 7, 
+  "Not Received 30D(sch)": 3, "Not Received 30D": 4, "ASP_Drop": 5, "Network_Change": 6, "Wrong Forecasting": 7, 
   "ATP-QOH Delta": 8, "No PO": 9, "PO Error": 10, "Not Enough PO Raised": 11,
   "Bad Fill Rate": 12, "Scheduled": 13, "Not Scheduled": 14, 
   "IWIT Pendency": 15, "SH-SH IWIT Issue": 16, "Other Loss": 17
 };
 
-// ROBUST COLUMN FINDER: Handles missing or renamed columns gracefully
+// EXTREMELY ROBUST COLUMN FINDER
 const findCol = (colsObj, namesArray) => {
     for (let n of namesArray) {
         let target = n.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -152,7 +152,6 @@ function downloadCSVsFromDrive(config) {
       let data2 = [];
       let baseHeaders = [];
       
-      // DYNAMIC COLUMN PICKER: Forces matching of columns across historical splits
       data2Array.forEach((chunkData, index) => {
         if (chunkData && chunkData.length > 0) {
           if (index === 0) {
@@ -542,6 +541,8 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       if (isAllowedDS) {
           let vDsIn = Number(row[idxDsIn]) || 0;
           let vDsTot = Number(row[idxDsTot]) || 0;
+          if (vDsIn > vDsTot) vDsTot = vDsIn; // Row level fix for data anomalies
+
           let vDsMstn = Number(row[idxDsMstn]) || 0, vDsMstnIt = Number(row[idxDsMstnIt]) || 0, vDsNorm = Number(row[idxDsNorm]) || 0, vInstockItDs = Number(row[idxInstockItDs]) || 0;
           
           let addDsMetrics = (b) => {
@@ -697,14 +698,12 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
       if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
 
-      // EXPLICIT HARDCODED BYPASS: Forces ASP Drop and Network Issue to map perfectly
+      // SMART REMARK MAPPER (Fixes the 0% bug)
       const rawRemark = String(row[rIdx] || '').trim().toLowerCase();
       let remark = 'Other Loss';
-      if (rawRemark === 'asp drop' || rawRemark === 'asp_drop') {
-          remark = 'ASP Drop';
-      } else if (rawRemark === 'network issue' || rawRemark === 'network_issue' || rawRemark === 'network change' || rawRemark === 'network_change') {
-          remark = 'Network Issue';
-      } else {
+      if (rawRemark.includes('asp')) remark = 'ASP_Drop';
+      else if (rawRemark.includes('network')) remark = 'Network_Change';
+      else {
           for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
               if (k.toLowerCase() === rawRemark) { remark = k; break; } 
           }
@@ -713,6 +712,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
       const fsns = Number(row[fsnIdx]) || 0;
       let dsInstock = Number(row[dsiIdx]) || 0;
       let dsTotal = Number(row[dstIdx]) || 0;
+      if (dsInstock > dsTotal) dsTotal = dsInstock; // Prevents >100% data bugs
       
       const buyNode = bnIdx !== undefined ? String(row[bnIdx] || '').trim().toLowerCase() : 'yes';
       
@@ -809,6 +809,8 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       const countFSN = Number(row[fsnIdx]) || 0;
       let countTotalDS = Number(row[tdIdx]) || 0;
       let countInstockDS = Number(row[idiIdx]) || 0;
+
+      if (countInstockDS > countTotalDS) countTotalDS = countInstockDS;
 
       let isAllowedSH = false; let isAllowedDS = false;
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; } 
@@ -963,6 +965,10 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
           let valAtp = Number(row[idxMstnAtp]) || 0, valSch = Number(row[idxMstnSch]) || 0, valPo  = Number(row[idxMstnPo]) || 0;
           let valNorm = Number(row[idxNorm]) || 0;
 
+          if (valAtp > valNorm) valNorm = valAtp;
+          if (valSch > valNorm) valNorm = valSch;
+          if (valPo > valNorm) valNorm = valPo;
+
           byGroup[finalGroupKey][reportDate].atp += valAtp; byGroup[finalGroupKey][reportDate].sch += valSch; byGroup[finalGroupKey][reportDate].po += valPo; byGroup[finalGroupKey][reportDate].norm += valNorm; byGroup[finalGroupKey][reportDate].shTotal += countFSN;
           grandTotalByDate[reportDate].atp += valAtp; grandTotalByDate[reportDate].sch += valSch; grandTotalByDate[reportDate].po += valPo; grandTotalByDate[reportDate].norm += valNorm; grandTotalByDate[reportDate].shTotal += countFSN;
       }
@@ -1076,10 +1082,10 @@ function exportRawCSV() {
       const rawRemark = String(row[findCol(colIdxP1, ['Loss_Remark'])] || '').trim().toLowerCase();
       let remark = 'Other Loss';
       
-      if (rawRemark === 'asp drop' || rawRemark === 'asp_drop') {
-          remark = 'ASP Drop';
-      } else if (rawRemark === 'network issue' || rawRemark === 'network_issue' || rawRemark === 'network change' || rawRemark === 'network_change') {
-          remark = 'Network Issue';
+      if (rawRemark.includes('asp')) {
+          remark = 'ASP_Drop';
+      } else if (rawRemark.includes('network')) {
+          remark = 'Network_Change';
       } else {
           for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
               if (k.toLowerCase() === rawRemark) { remark = k; break; } 
