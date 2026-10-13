@@ -21,10 +21,9 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
-// NATURAL PERCENTAGE CALCULATION
-const calcPct = (n, d) => d ? (n / d) * 100 : 0;
+// PERCENTAGE CALCULATOR WITH HARD CAP TO PREVENT >100% BUGS
+const calcPct = (n, d) => d ? Math.min((n / d) * 100, 100) : 0;
 
-// EXACT UI COLUMNS
 const LOSS_REMARK_SEQ = {
   "Instock": 0, "NPD": 1, "NO-PO|NO-QOH| NO-IRN": 2, 
   "Not Received 30D(sch)": 3, "Not Received 30D": 4, "ASP_Drop": 5, "Network_Change": 6, "Wrong Forecasting": 7, 
@@ -33,7 +32,6 @@ const LOSS_REMARK_SEQ = {
   "IWIT Pendency": 15, "SH-SH IWIT Issue": 16, "Other Loss": 17
 };
 
-// EXTREMELY ROBUST COLUMN FINDER
 const findCol = (colsObj, namesArray) => {
     for (let n of namesArray) {
         let target = n.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -512,9 +510,9 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
 
     for (let i = 0; i < data.length; i++) {
       let row = data[i];
-      const groupKey = (row[idxTag] || 'Unknown').toString().trim();
-      const zoneName = idxZone !== undefined ? (row[idxZone] || 'Unassigned').toString().trim() : 'Unassigned';
-      const shName = idxSH !== undefined ? (row[idxSH] || 'Unknown').toString().trim() : 'Unknown';
+      const groupKey = (idxTag !== undefined && row[idxTag] ? row[idxTag] : 'Unknown').toString().trim();
+      const zoneName = (idxZone !== undefined && row[idxZone] ? row[idxZone] : 'Unassigned').toString().trim();
+      const shName = (idxSH !== undefined && row[idxSH] ? row[idxSH] : 'Unknown').toString().trim();
 
       if (taggingFiltersRaw.length === 0) {
           let tagNorm = groupKey.toLowerCase().replace(/\s+/g, '');
@@ -689,7 +687,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
     Object.keys(LOSS_REMARK_SEQ).forEach(k => grandTotalRemarks[k] = 0);
     for (let i = 0; i < data.length; i++) {
       let row = data[i];
-      let groupKey = row[gColIdx] || 'Unknown';
+      let groupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
       
       let finalGroupKey = groupKey;
       if (groupColName === 'FSN' && titleIdx !== undefined) {
@@ -701,8 +699,8 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
       // SMART REMARK MAPPER (Fixes the 0% bug)
       const rawRemark = String(row[rIdx] || '').trim().toLowerCase();
       let remark = 'Other Loss';
-      if (rawRemark.includes('asp')) remark = 'ASP_Drop';
-      else if (rawRemark.includes('network')) remark = 'Network_Change';
+      if (rawRemark.includes('asp')) remark = 'ASP Drop';
+      else if (rawRemark.includes('network')) remark = 'Network Issue';
       else {
           for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
               if (k.toLowerCase() === rawRemark) { remark = k; break; } 
@@ -796,7 +794,9 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
 
     for (let i = 0; i < data.length; i++) {
-      let row = data[i], groupKey = row[gColIdx] || 'Unknown', reportDate = String(row[rDateIdx] || 'Unknown');
+      let row = data[i];
+      let groupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let reportDate = String(row[rDateIdx] || 'Unknown');
       
       let finalGroupKey = groupKey;
       if (groupColName === 'FSN' && titleIdx !== undefined) {
@@ -940,7 +940,9 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
 
     for (let i = 0; i < data.length; i++) {
-      let row = data[i], groupKey = row[gColIdx] || 'Unknown', reportDate = String(row[rDateIdx] || 'Unknown');
+      let row = data[i];
+      let groupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let reportDate = String(row[rDateIdx] || 'Unknown');
       
       let finalGroupKey = groupKey;
       if (groupColName === 'FSN' && titleIdx !== undefined) {
@@ -1083,9 +1085,9 @@ function exportRawCSV() {
       let remark = 'Other Loss';
       
       if (rawRemark.includes('asp')) {
-          remark = 'ASP_Drop';
+          remark = 'ASP Drop';
       } else if (rawRemark.includes('network')) {
-          remark = 'Network_Change';
+          remark = 'Network Issue';
       } else {
           for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
               if (k.toLowerCase() === rawRemark) { remark = k; break; } 
@@ -1198,6 +1200,18 @@ function exportRawCSV() {
 function populateFilterOptions() {
   let sets = { bu: new Set(), company: new Set(), kam: new Set(), kamLead: new Set(), owner: new Set(), sh: new Set(), brand: new Set(), vendor: new Set(), vertical: new Set(), supercategory: new Set(), tagging: new Set(), vmi: new Set(), buyingNode: new Set(), brandPoc: new Set(), fsn: new Set(), dsBucket: new Set(), zone: new Set(), updatedBu: new Set(), gourmet: new Set(), regional: new Set(), organic: new Set(), em: new Set(), ubpl: new Set() };
   
+  // PRE-FIND COLUMNS OUTSIDE THE LOOP (Fixes the Summary Table lag)
+  let idxBU1 = findCol(colIdxP1, ['BU']);
+  let idxComp1 = findCol(colIdxP1, ['Company']);
+  let idxKam1 = findCol(colIdxP1, ['KAM']);
+  let idxLead1 = findCol(colIdxP1, ['KAM_Lead']);
+  let idxOwner1 = findCol(colIdxP1, ['Instock_Owner']);
+  let idxSH1 = findCol(colIdxP1, ['FC_Code']);
+  let idxBrand1 = findCol(colIdxP1, ['brand']);
+  let idxVendor1 = findCol(colIdxP1, ['Vendor_Name']);
+  let idxVert1 = findCol(colIdxP1, ['analytic_vertical']);
+  let idxTag1 = findCol(colIdxP1, ['tagging']);
+  let idxVmi1 = findCol(colIdxP1, ['VMI_Flag', 'vmi']);
   let idxBrandPoc1 = findCol(colIdxP1, ['brand_poc', 'brandpoc']);
   let idxDsBucket1 = findCol(colIdxP1, ['Instock_DS_Bucket', 'instockdsbucket']);
   let idxZone1 = findCol(colIdxP1, ['Zone']);
@@ -1208,25 +1222,22 @@ function populateFilterOptions() {
   let idxOrg1 = findCol(colIdxP1, ['Organic_Flag', 'organic']);
   let idxEm1 = findCol(colIdxP1, ['Engagement_Manager', 'engagementmanager']);
   let idxUbpl1 = findCol(colIdxP1, ['UB_PL_Flag', 'ubpl', 'ub_pl']);
+  let idxFsn1 = findCol(colIdxP1, ['FSN', 'fsn']);
+  let idxBuyNode1 = findCol(colIdxP1, ['Buying_Node_Flag']);
 
   rawDataP1.forEach(row => {
-    if(row[findCol(colIdxP1, ['BU'])]) sets.bu.add(String(row[findCol(colIdxP1, ['BU'])]).trim()); 
-    if(row[findCol(colIdxP1, ['Company'])]) sets.company.add(String(row[findCol(colIdxP1, ['Company'])]).trim());
-    if(row[findCol(colIdxP1, ['KAM'])]) sets.kam.add(String(row[findCol(colIdxP1, ['KAM'])]).trim()); 
-    if(row[findCol(colIdxP1, ['KAM_Lead'])]) sets.kamLead.add(String(row[findCol(colIdxP1, ['KAM_Lead'])]).trim());
-    if(row[findCol(colIdxP1, ['Instock_Owner'])]) sets.owner.add(String(row[findCol(colIdxP1, ['Instock_Owner'])]).trim()); 
-    if(row[findCol(colIdxP1, ['FC_Code'])]) sets.sh.add(String(row[findCol(colIdxP1, ['FC_Code'])]).trim());
-    if(row[findCol(colIdxP1, ['brand'])]) sets.brand.add(String(row[findCol(colIdxP1, ['brand'])]).trim()); 
-    if(row[findCol(colIdxP1, ['Vendor_Name'])]) sets.vendor.add(String(row[findCol(colIdxP1, ['Vendor_Name'])]).trim());
-    if(row[findCol(colIdxP1, ['analytic_vertical'])]) sets.vertical.add(String(row[findCol(colIdxP1, ['analytic_vertical'])]).trim()); 
-    if(row[findCol(colIdxP1, ['tagging'])]) sets.tagging.add(String(row[findCol(colIdxP1, ['tagging'])]).trim());
-    
-    let vmiCol = findCol(colIdxP1, ['VMI_Flag', 'vmi']); 
-    if(vmiCol !== undefined && row[vmiCol]) sets.vmi.add(String(row[vmiCol]).trim());
-    
-    let bnCol = findCol(colIdxP1, ['Buying_Node_Flag']); 
-    if(bnCol !== undefined && row[bnCol]) sets.buyingNode.add(String(row[bnCol]).trim());
-    
+    if(idxBU1 !== undefined && row[idxBU1]) sets.bu.add(String(row[idxBU1]).trim()); 
+    if(idxComp1 !== undefined && row[idxComp1]) sets.company.add(String(row[idxComp1]).trim());
+    if(idxKam1 !== undefined && row[idxKam1]) sets.kam.add(String(row[idxKam1]).trim()); 
+    if(idxLead1 !== undefined && row[idxLead1]) sets.kamLead.add(String(row[idxLead1]).trim());
+    if(idxOwner1 !== undefined && row[idxOwner1]) sets.owner.add(String(row[idxOwner1]).trim()); 
+    if(idxSH1 !== undefined && row[idxSH1]) sets.sh.add(String(row[idxSH1]).trim());
+    if(idxBrand1 !== undefined && row[idxBrand1]) sets.brand.add(String(row[idxBrand1]).trim()); 
+    if(idxVendor1 !== undefined && row[idxVendor1]) sets.vendor.add(String(row[idxVendor1]).trim());
+    if(idxVert1 !== undefined && row[idxVert1]) sets.vertical.add(String(row[idxVert1]).trim()); 
+    if(idxTag1 !== undefined && row[idxTag1]) sets.tagging.add(String(row[idxTag1]).trim());
+    if(idxVmi1 !== undefined && row[idxVmi1]) sets.vmi.add(String(row[idxVmi1]).trim());
+    if(idxBuyNode1 !== undefined && row[idxBuyNode1]) sets.buyingNode.add(String(row[idxBuyNode1]).trim());
     if(idxBrandPoc1 !== undefined && row[idxBrandPoc1]) sets.brandPoc.add(String(row[idxBrandPoc1]).trim());
     if(idxDsBucket1 !== undefined && row[idxDsBucket1]) sets.dsBucket.add(String(row[idxDsBucket1]).trim());
     if(idxZone1 !== undefined && row[idxZone1]) sets.zone.add(String(row[idxZone1]).trim());
@@ -1234,13 +1245,10 @@ function populateFilterOptions() {
     if(idxGourmet1 !== undefined && row[idxGourmet1]) sets.gourmet.add(String(row[idxGourmet1]).trim());
     if(idxRegional1 !== undefined && row[idxRegional1]) sets.regional.add(String(row[idxRegional1]).trim());
     if(idxSuper1 !== undefined && row[idxSuper1]) sets.supercategory.add(String(row[idxSuper1]).trim());
-    
     if(idxOrg1 !== undefined && row[idxOrg1]) sets.organic.add(String(row[idxOrg1]).trim());
     if(idxEm1 !== undefined && row[idxEm1]) sets.em.add(String(row[idxEm1]).trim());
     if(idxUbpl1 !== undefined && row[idxUbpl1]) sets.ubpl.add(String(row[idxUbpl1]).trim());
-    
-    let fsnCol = findCol(colIdxP1, ['FSN', 'fsn']); 
-    if(fsnCol !== undefined && row[fsnCol]) sets.fsn.add(String(row[fsnCol]).trim());
+    if(idxFsn1 !== undefined && row[idxFsn1]) sets.fsn.add(String(row[idxFsn1]).trim());
   });
   const fillSelect = (id, set) => { const el = $(id); Array.from(set).sort().forEach(val => el.append(new Option(val, val))); };
   fillSelect('#filter-bu', sets.bu); fillSelect('#filter-company', sets.company); fillSelect('#filter-kam', sets.kam); fillSelect('#filter-kam-lead', sets.kamLead); fillSelect('#filter-owner', sets.owner);
