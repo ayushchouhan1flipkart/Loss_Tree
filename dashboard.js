@@ -21,7 +21,8 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
-const calcPct = (n, d) => d ? (n / d) * 100 : 0;
+// MAX 100% SAFETY CAP
+const calcPct = (n, d) => d ? Math.min((n / d) * 100, 100) : 0;
 
 const LOSS_REMARK_SEQ = {
   "Instock": 0, "NPD": 1, "NO-PO|NO-QOH| NO-IRN": 2, 
@@ -486,6 +487,7 @@ function renderVisibleTable() {
   }, 250);
 }
 
+// FIXED SUMMARY TABLE: Safe column indices prevent DataTables from crashing
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
@@ -622,11 +624,9 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
         shChildren.sort((a, b) => a.sort_order - b.sort_order); shChildren.forEach(child => t3Data.push(child));
     });
 
-    // RESTORED SUMMARY TABLE COLUMNS
+    // CACHE-SAFE COLUMNS: Hidden background columns are moved to the back so DataTables doesn't crash on freeze.
     let columns = [
-      { title: "GT", data: 'is_gt', visible: false, searchable: false },
-      { title: "Sort", data: 'sort_order', visible: false, searchable: false },
-      { title: "Tagging", data: 'group', orderData: [0, 1], render: renderGroupCol },
+      { title: "Tagging", data: 'group', orderData: [20, 21], render: renderGroupCol },
       { title: "FSN Count", data: 'fsn', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
       { title: "Current ATP", data: 'atp', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
       { title: "QoH", data: 'qoh', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
@@ -645,13 +645,15 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       { title: "MSTN (+Sch) %", data: 'mstnSchPct', type: 'num', render: function(d,t){ return t==='display'? d.toFixed(1)+'%' : d; }, createdCell: applyColorCoding },
       { title: "MSTN (+PO) %", data: 'mstnPoPct', type: 'num', render: function(d,t){ return t==='display'? d.toFixed(1)+'%' : d; }, createdCell: applyColorCoding },
       { title: "SH-DS IWIT (T-1)", data: 'iwit', type: 'num', className: 'section-divider', render: $.fn.dataTable.render.number(',', '.', 0) },
-      { title: "IRN (T-2)", data: 'irn', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }
+      { title: "IRN (T-2)", data: 'irn', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
+      { title: "GT", data: 'is_gt', visible: false, searchable: false },
+      { title: "Sort", data: 'sort_order', visible: false, searchable: false }
     ];
 
     const dtConfig = {
       columns: columns, deferRender: true, scrollX: true, scrollY: '50vh', scrollCollapse: true, 
       fixedColumns: { left: 1 }, dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
-      orderFixed: [0, 'asc'], order: [[1, 'asc']], paging: false, 
+      order: [[20, 'asc'], [21, 'asc']], paging: false, 
       createdRow: function (row, data) { 
           if (data.isGrandTotal) $(row).addClass('total-row'); 
           else if (data.isGroupHeader) { $(row).addClass('group-header'); $(row).attr('data-zone', data.zoneSafe); }
