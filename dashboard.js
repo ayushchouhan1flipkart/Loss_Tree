@@ -487,11 +487,12 @@ function renderVisibleTable() {
   }, 250);
 }
 
-// 100% BULLETPROOF SUMMARY TABLE RENDERING: Scopes removed entirely from loops
+// BULLETPROOF SUMMARY TABLE RENDERING
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
-    let gt = { fsn: 0, atp: 0, qoh: 0, openPo: 0, fdrr: 0, sdrr: 0, dsInstock: 0, dsTotal: 0, shInstock: 0, shSch: 0, shPo: 0, mstnAtp: 0, mstnSch: 0, mstnPo: 0, norm: 0, iwit: 0, irn: 0, dsMstn: 0, dsMstnIt: 0, dsNorm: 0, instockItDs: 0, dsNormRaw: 0 };
+    const initBucket = () => ({ fsn: 0, atp: 0, qoh: 0, openPo: 0, fdrr: 0, sdrr: 0, dsInstock: 0, dsTotal: 0, shInstock: 0, shSch: 0, shPo: 0, mstnAtp: 0, mstnSch: 0, mstnPo: 0, norm: 0, iwit: 0, irn: 0, dsMstn: 0, dsMstnIt: 0, dsNorm: 0, instockItDs: 0, dsNormRaw: 0 });
+    let gt = initBucket();
 
     let idxTag = findCol(colIdxP1, ['tagging']); let idxZone = findCol(colIdxP1, ['Zone']); let idxSH = findCol(colIdxP1, ['FC_Code']);
     let idxFsn = findCol(colIdxP1, ['FSN_Count']); let idxAtp = findCol(colIdxP1, ['ATP_Current']); let idxQoh = findCol(colIdxP1, ['QOH']);
@@ -507,84 +508,69 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
     let taggingFiltersRaw = $('#filter-tagging').val() || [];
 
-    const initBucket = () => ({ fsn: 0, atp: 0, qoh: 0, openPo: 0, fdrr: 0, sdrr: 0, dsInstock: 0, dsTotal: 0, shInstock: 0, shSch: 0, shPo: 0, mstnAtp: 0, mstnSch: 0, mstnPo: 0, norm: 0, iwit: 0, irn: 0, dsMstn: 0, dsMstnIt: 0, dsNorm: 0, instockItDs: 0, dsNormRaw: 0 });
-
-    // SAFE MATHEMATICAL AGGREGATORS MOVED OUTSIDE THE LOOP
-    const applyDsMetrics = (b, dsIn, dsTot, dsMstn, dsMstnIt, dsNorm, inItDs) => {
-        b.dsInstock += dsIn; b.dsTotal += dsTot; b.dsMstn += dsMstn; b.dsMstnIt += dsMstnIt; b.dsNorm += dsNorm; b.instockItDs += inItDs; b.dsNormRaw += dsNorm;
-    };
-
-    const applyShMetrics = (b, fsn, atp, qoh, opo, fdrr, sdrr, shIn, shSch, shPo, mAtp, mSch, mPo, norm, iwit, irn) => {
-        b.fsn += fsn; b.atp += atp; b.qoh += qoh; b.openPo += opo; b.fdrr += fdrr; b.sdrr += sdrr;
-        b.shInstock += shIn; b.shSch += shSch; b.shPo += shPo;
-        b.mstnAtp += mAtp; b.mstnSch += mSch; b.mstnPo += mPo; b.norm += norm;
-        b.iwit += iwit; b.irn += irn;
+    // SAFE MATHEMATICAL AGGREGATOR (Fixed ReferenceError)
+    const applySafeMath = (b, vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS) => {
+        if (isAllowedDS) {
+            b.dsInstock += vDsIn; b.dsTotal += vDsTot; b.dsMstn += vDsMstn; b.dsMstnIt += vDsMstnIt; b.dsNorm += vDsNorm; b.instockItDs += vInstockItDs; b.dsNormRaw += vDsNorm;
+        }
+        if (isAllowedSH) {
+            b.fsn += vFsn; b.atp += vAtp; b.qoh += vQoh; b.openPo += vOpenPo; b.fdrr += vFdrr; b.sdrr += vSdrr;
+            b.shInstock += isShIn; b.shSch += isShSch; b.shPo += isShPo;
+            b.mstnAtp += vMstnAtp; b.mstnSch += vMstnSch; b.mstnPo += vMstnPo; b.norm += vNorm;
+            b.iwit += vIwit; b.irn += vIrn;
+        }
     };
 
     for (let i = 0; i < data.length; i++) {
-      let row = data[i];
-      const groupKey = (idxTag !== undefined && row[idxTag] ? row[idxTag] : 'Unknown').toString().trim();
-      const zoneName = (idxZone !== undefined && row[idxZone] ? row[idxZone] : 'Unassigned').toString().trim();
-      const shName = (idxSH !== undefined && row[idxSH] ? row[idxSH] : 'Unknown').toString().trim();
+        let row = data[i];
+        const groupKey = (idxTag !== undefined && row[idxTag] ? row[idxTag] : 'Unknown').toString().trim();
+        const zoneName = (idxZone !== undefined && row[idxZone] ? row[idxZone] : 'Unassigned').toString().trim();
+        const shName = (idxSH !== undefined && row[idxSH] ? row[idxSH] : 'Unknown').toString().trim();
 
-      if (taggingFiltersRaw.length === 0) {
-          let tagNorm = groupKey.toLowerCase().replace(/\s+/g, '');
-          if (tagNorm.includes('rest')) continue; 
-      }
+        if (taggingFiltersRaw.length === 0) {
+            let tagNorm = groupKey.toLowerCase().replace(/\s+/g, '');
+            if (tagNorm.includes('rest')) continue; 
+        }
 
-      const buyNode = bnIdx !== undefined ? String(row[bnIdx] || '').trim().toLowerCase() : 'yes';
-      
-      let isAllowedSH = false; let isAllowedDS = false;
-      if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; } 
-      else { let matchesFilter = mappedBnFilters.includes(buyNode); isAllowedSH = matchesFilter; isAllowedDS = matchesFilter; }
+        const buyNode = bnIdx !== undefined ? String(row[bnIdx] || '').trim().toLowerCase() : 'yes';
+        let isAllowedSH = false; let isAllowedDS = false;
+        if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; } 
+        else { let matchesFilter = mappedBnFilters.includes(buyNode); isAllowedSH = matchesFilter; isAllowedDS = matchesFilter; }
 
-      if (!byGroup[groupKey]) byGroup[groupKey] = initBucket();
-      if (!zoneTotals[zoneName]) zoneTotals[zoneName] = initBucket();
-      let ztKey = zoneName + "|||" + groupKey;
-      if (!byZoneTag[ztKey]) byZoneTag[ztKey] = initBucket();
+        if (!byGroup[groupKey]) byGroup[groupKey] = initBucket();
+        if (!zoneTotals[zoneName]) zoneTotals[zoneName] = initBucket();
+        let ztKey = zoneName + "|||" + groupKey;
+        if (!byZoneTag[ztKey]) byZoneTag[ztKey] = initBucket();
+        if (!shTotals[shName]) shTotals[shName] = initBucket();
+        let shTagKey = shName + "|||" + groupKey;
+        if (!byShTag[shTagKey]) byShTag[shTagKey] = initBucket();
+        
+        let vFsn = Number(row[idxFsn]) || 0;
+        let vDsIn = Number(row[idxDsIn]) || 0;
+        let vDsTot = Number(row[idxDsTot]) || 0;
+        if (vDsIn > vDsTot) vDsTot = vDsIn; 
 
-      if (!shTotals[shName]) shTotals[shName] = initBucket();
-      let shTagKey = shName + "|||" + groupKey;
-      if (!byShTag[shTagKey]) byShTag[shTagKey] = initBucket();
-      
-      let vFsn = Number(row[idxFsn]) || 0;
+        let vDsMstn = Number(row[idxDsMstn]) || 0, vDsMstnIt = Number(row[idxDsMstnIt]) || 0, vDsNorm = Number(row[idxDsNorm]) || 0, vInstockItDs = Number(row[idxInstockItDs]) || 0;
+        
+        let vAtp = Number(row[idxAtp]) || 0, vQoh = Number(row[idxQoh]) || 0, vOpenPo = Number(row[idxOpenPo]) || 0;
+        let vFdrr = Number(row[idxFdrr]) || 0, vSdrr = Number(row[idxSdrr]) || 0;
+        let vMstnAtp = Number(row[idxMstnAtp]) || 0, vMstnSch = Number(row[idxMstnSch]) || 0, vMstnPo = Number(row[idxMstnPo]) || 0, vNorm = Number(row[idxNorm]) || 0;
+        let vIwit = idxIwit !== undefined ? (Number(row[idxIwit]) || 0) : 0;
+        let vIrn = idxIrn !== undefined ? (Number(row[idxIrn]) || 0) : 0;
+        let bDoh = (idxDoh !== undefined && row[idxDoh] ? row[idxDoh] : '').toString().trim().toUpperCase();
+        let bSchedDoh = (idxSchedDoh !== undefined && row[idxSchedDoh] ? row[idxSchedDoh] : '').toString().trim().toUpperCase();
+        let bPoDoh = (idxPoDoh !== undefined && row[idxPoDoh] ? row[idxPoDoh] : '').toString().trim().toUpperCase();
 
-      if (isAllowedDS) {
-          let vDsIn = Number(row[idxDsIn]) || 0;
-          let vDsTot = Number(row[idxDsTot]) || 0;
-          if (vDsIn > vDsTot) vDsTot = vDsIn; 
+        let isShIn = (bDoh !== '' && bDoh !== '<2DOH') ? vFsn : 0;
+        let isShSch = (bSchedDoh !== '' && bSchedDoh !== '<2DOH') ? vFsn : 0;
+        let isShPo = (bPoDoh !== '' && bPoDoh !== '<2DOH') ? vFsn : 0;
 
-          let vDsMstn = Number(row[idxDsMstn]) || 0, vDsMstnIt = Number(row[idxDsMstnIt]) || 0, vDsNorm = Number(row[idxDsNorm]) || 0, vInstockItDs = Number(row[idxInstockItDs]) || 0;
-          
-          applyDsMetrics(byGroup[groupKey], vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs); 
-          applyDsMetrics(zoneTotals[zoneName], vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs); 
-          applyDsMetrics(byZoneTag[ztKey], vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs);
-          applyDsMetrics(shTotals[shName], vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs); 
-          applyDsMetrics(byShTag[shTagKey], vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs); 
-          applyDsMetrics(gt, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs);
-      }
-
-      if (isAllowedSH) {
-          let vAtp = Number(row[idxAtp]) || 0, vQoh = Number(row[idxQoh]) || 0, vOpenPo = Number(row[idxOpenPo]) || 0;
-          let vFdrr = Number(row[idxFdrr]) || 0, vSdrr = Number(row[idxSdrr]) || 0;
-          let vMstnAtp = Number(row[idxMstnAtp]) || 0, vMstnSch = Number(row[idxMstnSch]) || 0, vMstnPo = Number(row[idxMstnPo]) || 0, vNorm = Number(row[idxNorm]) || 0;
-          let vIwit = idxIwit !== undefined ? (Number(row[idxIwit]) || 0) : 0;
-          let vIrn = idxIrn !== undefined ? (Number(row[idxIrn]) || 0) : 0;
-          let bDoh = (idxDoh !== undefined && row[idxDoh] ? row[idxDoh] : '').toString().trim().toUpperCase();
-          let bSchedDoh = (idxSchedDoh !== undefined && row[idxSchedDoh] ? row[idxSchedDoh] : '').toString().trim().toUpperCase();
-          let bPoDoh = (idxPoDoh !== undefined && row[idxPoDoh] ? row[idxPoDoh] : '').toString().trim().toUpperCase();
-
-          let isShIn = (bDoh !== '' && bDoh !== '<2DOH') ? vFsn : 0;
-          let isShSch = (bSchedDoh !== '' && bSchedDoh !== '<2DOH') ? vFsn : 0;
-          let isShPo = (bPoDoh !== '' && bPoDoh !== '<2DOH') ? vFsn : 0;
-
-          applyShMetrics(byGroup[groupKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
-          applyShMetrics(zoneTotals[zoneName], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
-          applyShMetrics(byZoneTag[ztKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
-          applyShMetrics(shTotals[shName], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
-          applyShMetrics(byShTag[shTagKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
-          applyShMetrics(gt, vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
-      }
+        applySafeMath(byGroup[groupKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
+        applySafeMath(zoneTotals[zoneName], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
+        applySafeMath(byZoneTag[ztKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
+        applySafeMath(shTotals[shName], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
+        applySafeMath(byShTag[shTagKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
+        applySafeMath(gt, vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
     }
 
     const getSorter = (groupName) => {
