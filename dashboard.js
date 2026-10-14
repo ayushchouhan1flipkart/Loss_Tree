@@ -486,7 +486,7 @@ function renderVisibleTable() {
   }, 250);
 }
 
-// RESTORED SUMMARY TABLE RENDERER
+// RESTORED SUMMARY TABLE WITH CORRECT ROW FORMATTER
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
@@ -539,8 +539,6 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       if (isAllowedDS) {
           let vDsIn = Number(row[idxDsIn]) || 0;
           let vDsTot = Number(row[idxDsTot]) || 0;
-          if (vDsIn > vDsTot) vDsTot = vDsIn; 
-
           let vDsMstn = Number(row[idxDsMstn]) || 0, vDsMstnIt = Number(row[idxDsMstnIt]) || 0, vDsNorm = Number(row[idxDsNorm]) || 0, vInstockItDs = Number(row[idxInstockItDs]) || 0;
           
           let addDsMetrics = (b) => {
@@ -556,7 +554,9 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
           let vMstnAtp = Number(row[idxMstnAtp]) || 0, vMstnSch = Number(row[idxMstnSch]) || 0, vMstnPo = Number(row[idxMstnPo]) || 0, vNorm = Number(row[idxNorm]) || 0;
           let vIwit = idxIwit !== undefined ? (Number(row[idxIwit]) || 0) : 0;
           let vIrn = idxIrn !== undefined ? (Number(row[idxIrn]) || 0) : 0;
-          let bDoh = (row[idxDoh] || '').toString().trim().toUpperCase(), bSchedDoh = (row[idxSchedDoh] || '').toString().trim().toUpperCase(), bPoDoh = (row[idxPoDoh] || '').toString().trim().toUpperCase();
+          let bDoh = (idxDoh !== undefined && row[idxDoh] ? row[idxDoh] : '').toString().trim().toUpperCase();
+          let bSchedDoh = (idxSchedDoh !== undefined && row[idxSchedDoh] ? row[idxSchedDoh] : '').toString().trim().toUpperCase();
+          let bPoDoh = (idxPoDoh !== undefined && row[idxPoDoh] ? row[idxPoDoh] : '').toString().trim().toUpperCase();
 
           let isShIn = (bDoh !== '' && bDoh !== '<2DOH') ? vFsn : 0;
           let isShSch = (bSchedDoh !== '' && bSchedDoh !== '<2DOH') ? vFsn : 0;
@@ -622,8 +622,8 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
     });
 
     let columns = [
-      { data: 'is_gt', visible: false, searchable: false },
-      { data: 'sort_order', visible: false, searchable: false },
+      { title: "", data: 'is_gt', visible: false, searchable: false },
+      { title: "", data: 'sort_order', visible: false, searchable: false },
       { title: "Tagging", data: 'group', orderData: [0, 1], render: renderGroupCol },
       { title: "FSN Count", data: 'fsn', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
       { title: "Current ATP", data: 'atp', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
@@ -696,7 +696,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
       if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
 
-      // CORRECTED EXACT MAPPER FOR 'ASP Drop' and 'Network Issue'
+      // EXACT LOSS REMARK MAPPER (Fixes ASP and Network 0% issue)
       const rawRemark = String(row[rIdx] || '').trim().toLowerCase();
       let remark = 'Other Loss';
       if (rawRemark.includes('asp')) remark = 'ASP Drop';
@@ -710,7 +710,6 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
       const fsns = Number(row[fsnIdx]) || 0;
       let dsInstock = Number(row[dsiIdx]) || 0;
       let dsTotal = Number(row[dstIdx]) || 0;
-      if (dsInstock > dsTotal) dsTotal = dsInstock; 
       
       const buyNode = bnIdx !== undefined ? String(row[bnIdx] || '').trim().toLowerCase() : 'yes';
       
@@ -755,7 +754,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
         });
     }
 
-    let columns = [ { data: 'is_gt', visible: false, searchable: false }, { title: groupColName, data: 'group', render: renderGroupCol }, { title: "SH Total FSNs", data: 'total', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }, { title: "DS Instock %", data: 'dsInstockPct', type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: applyColorCoding } ];
+    let columns = [ { title: "", data: 'is_gt', visible: false, searchable: false }, { title: groupColName, data: 'group', render: renderGroupCol }, { title: "SH Total FSNs", data: 'total', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }, { title: "DS Instock %", data: 'dsInstockPct', type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: applyColorCoding } ];
     const sortedRemarks = Object.keys(LOSS_REMARK_SEQ).sort((a,b) => LOSS_REMARK_SEQ[a] - LOSS_REMARK_SEQ[b]);
     sortedRemarks.forEach(remark => { columns.push({ title: remark === 'Instock' ? 'SH Instock %' : remark, data: remark, type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: function (td, cellData, rowData) { if (remark === 'Instock') applyColorCoding(td, cellData, rowData); else if (!rowData.isGrandTotal && !rowData.isGroupHeader && cellData > 15) { td.style.color = '#b91c1c'; td.style.fontWeight = '700'; } } }); });
 
@@ -809,8 +808,6 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       const countFSN = Number(row[fsnIdx]) || 0;
       let countTotalDS = Number(row[tdIdx]) || 0;
       let countInstockDS = Number(row[idiIdx]) || 0;
-
-      if (countInstockDS > countTotalDS) countTotalDS = countInstockDS;
 
       let isAllowedSH = false; let isAllowedDS = false;
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; } 
@@ -877,7 +874,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     }
 
     let columns = [
-      { data: 'is_gt', visible: false, searchable: false },
+      { title: "", data: 'is_gt', visible: false, searchable: false },
       { title: groupColName, data: 'group', render: renderGroupCol },
       { title: "Total FSNs (Latest SH)", data: 'latestTotalFSNs', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
       { title: "Latest DS Loss", data: 'latestDSLoss', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }
@@ -967,10 +964,6 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
           let valAtp = Number(row[idxMstnAtp]) || 0, valSch = Number(row[idxMstnSch]) || 0, valPo  = Number(row[idxMstnPo]) || 0;
           let valNorm = Number(row[idxNorm]) || 0;
 
-          if (valAtp > valNorm) valNorm = valAtp;
-          if (valSch > valNorm) valNorm = valSch;
-          if (valPo > valNorm) valNorm = valPo;
-
           byGroup[finalGroupKey][reportDate].atp += valAtp; byGroup[finalGroupKey][reportDate].sch += valSch; byGroup[finalGroupKey][reportDate].po += valPo; byGroup[finalGroupKey][reportDate].norm += valNorm; byGroup[finalGroupKey][reportDate].shTotal += countFSN;
           grandTotalByDate[reportDate].atp += valAtp; grandTotalByDate[reportDate].sch += valSch; grandTotalByDate[reportDate].po += valPo; grandTotalByDate[reportDate].norm += valNorm; grandTotalByDate[reportDate].shTotal += countFSN;
       }
@@ -1026,7 +1019,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     }
 
     let columns = [
-      { data: 'is_gt', visible: false, searchable: false },
+      { title: "", data: 'is_gt', visible: false, searchable: false },
       { title: groupColName, data: 'group', render: renderGroupCol },
       { title: "Total FSNs (Latest SH)", data: 'latestTotalFSNs', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }
     ];
@@ -1081,22 +1074,20 @@ function exportRawCSV() {
 
       if (isShLevel && zIdx !== undefined) { let zName = (row[zIdx] || 'Unassigned').toString().trim(); finalGroupKey = zName + " | " + finalGroupKey; }
       
-      // EXPLICIT MAPPER FOR EXPORT
       const rawRemark = String(row[findCol(colIdxP1, ['Loss_Remark'])] || '').trim().toLowerCase();
       let remark = 'Other Loss';
-      if (rawRemark.includes('asp')) remark = 'ASP Drop';
-      else if (rawRemark.includes('network')) remark = 'Network Issue';
-      else {
+      
+      if (rawRemark.includes('asp')) {
+          remark = 'ASP Drop';
+      } else if (rawRemark.includes('network')) {
+          remark = 'Network Issue';
+      } else {
           for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
               if (k.toLowerCase() === rawRemark) { remark = k; break; } 
           }
       }
 
-      const fsns = Number(row[findCol(colIdxP1, ['FSN_Count'])]) || 0;
-      let dsInstock = Number(row[findCol(colIdxP1, ['Instock_DS_Count'])]) || 0;
-      let dsTotal = Number(row[findCol(colIdxP1, ['Total_DS_Count'])]) || 0;
-      if(dsInstock > dsTotal) dsTotal = dsInstock;
-
+      const fsns = Number(row[findCol(colIdxP1, ['FSN_Count'])]) || 0, dsInstock = Number(row[findCol(colIdxP1, ['Instock_DS_Count'])]) || 0, dsTotal = Number(row[findCol(colIdxP1, ['Total_DS_Count'])]) || 0;
       const buyNode = buyNodeColP1 !== undefined ? (row[buyNodeColP1] || '').toString().trim().toLowerCase() : 'yes';
       
       let isAllowedSH = false; let isAllowedDS = false;
@@ -1135,10 +1126,7 @@ function exportRawCSV() {
       if (isShLevel && zIdx !== undefined) { let zName = (row[zIdx] || 'Unassigned').toString().trim(); finalGroupKey = zName + " | " + finalGroupKey; }
 
       const remark = String(row[findCol(colIdxP2, ['Loss_Remark'])] || '').trim().toLowerCase(), buyNode = String(row[buyIdx] || '').trim().toLowerCase();
-      const countFSN = Number(row[findCol(colIdxP2, ['FSN_Count'])]) || 0;
-      let countTotalDS = Number(row[findCol(colIdxP2, ['Total_DS_Count'])]) || 0;
-      let countInstockDS = Number(row[findCol(colIdxP2, ['Instock_DS_Count'])]) || 0;
-      if (countInstockDS > countTotalDS) countTotalDS = countInstockDS;
+      const countFSN = Number(row[findCol(colIdxP2, ['FSN_Count'])]) || 0, countTotalDS = Number(row[findCol(colIdxP2, ['Total_DS_Count'])]) || 0, countInstockDS = Number(row[findCol(colIdxP2, ['Instock_DS_Count'])]) || 0;
       
       let isAllowedSH = false; let isAllowedDS = false;
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; }
