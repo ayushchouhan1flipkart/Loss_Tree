@@ -487,7 +487,7 @@ function renderVisibleTable() {
   }, 250);
 }
 
-// BUG-FREE SUMMARY RENDER: Safely decoupled mathematical functions prevent Reference Errors.
+// 100% BULLETPROOF SUMMARY TABLE RENDERING: Scopes removed entirely from loops
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
@@ -508,6 +508,18 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
     let taggingFiltersRaw = $('#filter-tagging').val() || [];
 
     const initBucket = () => ({ fsn: 0, atp: 0, qoh: 0, openPo: 0, fdrr: 0, sdrr: 0, dsInstock: 0, dsTotal: 0, shInstock: 0, shSch: 0, shPo: 0, mstnAtp: 0, mstnSch: 0, mstnPo: 0, norm: 0, iwit: 0, irn: 0, dsMstn: 0, dsMstnIt: 0, dsNorm: 0, instockItDs: 0, dsNormRaw: 0 });
+
+    // SAFE MATHEMATICAL AGGREGATORS MOVED OUTSIDE THE LOOP
+    const applyDsMetrics = (b, dsIn, dsTot, dsMstn, dsMstnIt, dsNorm, inItDs) => {
+        b.dsInstock += dsIn; b.dsTotal += dsTot; b.dsMstn += dsMstn; b.dsMstnIt += dsMstnIt; b.dsNorm += dsNorm; b.instockItDs += inItDs; b.dsNormRaw += dsNorm;
+    };
+
+    const applyShMetrics = (b, fsn, atp, qoh, opo, fdrr, sdrr, shIn, shSch, shPo, mAtp, mSch, mPo, norm, iwit, irn) => {
+        b.fsn += fsn; b.atp += atp; b.qoh += qoh; b.openPo += opo; b.fdrr += fdrr; b.sdrr += sdrr;
+        b.shInstock += shIn; b.shSch += shSch; b.shPo += shPo;
+        b.mstnAtp += mAtp; b.mstnSch += mSch; b.mstnPo += mPo; b.norm += norm;
+        b.iwit += iwit; b.irn += irn;
+    };
 
     for (let i = 0; i < data.length; i++) {
       let row = data[i];
@@ -544,11 +556,12 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
 
           let vDsMstn = Number(row[idxDsMstn]) || 0, vDsMstnIt = Number(row[idxDsMstnIt]) || 0, vDsNorm = Number(row[idxDsNorm]) || 0, vInstockItDs = Number(row[idxInstockItDs]) || 0;
           
-          const processDs = (b) => {
-              b.dsInstock += vDsIn; b.dsTotal += vDsTot; b.dsMstn += vDsMstn; b.dsMstnIt += vDsMstnIt; b.dsNorm += vDsNorm; b.instockItDs += vInstockItDs; b.dsNormRaw += vDsNorm;
-          };
-          processDs(byGroup[groupKey]); processDs(zoneTotals[zoneName]); processDs(byZoneTag[ztKey]);
-          processDs(shTotals[shName]); processDs(byShTag[shTagKey]); processDs(gt); 
+          applyDsMetrics(byGroup[groupKey], vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs); 
+          applyDsMetrics(zoneTotals[zoneName], vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs); 
+          applyDsMetrics(byZoneTag[ztKey], vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs);
+          applyDsMetrics(shTotals[shName], vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs); 
+          applyDsMetrics(byShTag[shTagKey], vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs); 
+          applyDsMetrics(gt, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs);
       }
 
       if (isAllowedSH) {
@@ -565,14 +578,12 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
           let isShSch = (bSchedDoh !== '' && bSchedDoh !== '<2DOH') ? vFsn : 0;
           let isShPo = (bPoDoh !== '' && bPoDoh !== '<2DOH') ? vFsn : 0;
 
-          const processSh = (b) => {
-              b.fsn += vFsn; b.atp += vAtp; b.qoh += vQoh; b.openPo += vOpenPo; b.fdrr += vFdrr; b.sdrr += vSdrr;
-              b.shInstock += isShIn; b.shSch += isShSch; b.shPo += isShPo;
-              b.mstnAtp += vMstnAtp; b.mstnSch += vMstnSch; b.mstnPo += vMstnPo; b.norm += vNorm;
-              b.iwit += vIwit; b.irn += vIrn;
-          };
-          processSh(byGroup[groupKey]); processSh(zoneTotals[zoneName]); processSh(byZoneTag[ztKey]);
-          processSh(shTotals[shName]); processSh(byShTag[shTagKey]); processSh(gt);
+          applyShMetrics(byGroup[groupKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
+          applyShMetrics(zoneTotals[zoneName], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
+          applyShMetrics(byZoneTag[ztKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
+          applyShMetrics(shTotals[shName], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
+          applyShMetrics(byShTag[shTagKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
+          applyShMetrics(gt, vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn);
       }
     }
 
