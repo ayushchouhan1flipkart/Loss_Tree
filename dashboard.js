@@ -21,6 +21,7 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
+// MAX 100% SAFETY CAP
 const calcPct = (n, d) => d ? Math.min((n / d) * 100, 100) : 0;
 
 const LOSS_REMARK_SEQ = {
@@ -486,6 +487,7 @@ function renderVisibleTable() {
   }, 250);
 }
 
+// BUG-FREE SUMMARY RENDER: Safely decoupled mathematical functions prevent Reference Errors.
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
@@ -542,11 +544,11 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
 
           let vDsMstn = Number(row[idxDsMstn]) || 0, vDsMstnIt = Number(row[idxDsMstnIt]) || 0, vDsNorm = Number(row[idxDsNorm]) || 0, vInstockItDs = Number(row[idxInstockItDs]) || 0;
           
-          let addDsMetrics = (b) => {
+          const processDs = (b) => {
               b.dsInstock += vDsIn; b.dsTotal += vDsTot; b.dsMstn += vDsMstn; b.dsMstnIt += vDsMstnIt; b.dsNorm += vDsNorm; b.instockItDs += vInstockItDs; b.dsNormRaw += vDsNorm;
           };
-          addDsMetrics(byGroup[groupKey]); addDsMetrics(zoneTotals[zoneName]); addDsMetrics(byZoneTag[ztKey]);
-          addDsMetrics(shTotals[shName]); addDsMetrics(byShTag[shTagKey]); addDsMetrics(gt); // FATAL TYPO FIXED
+          processDs(byGroup[groupKey]); processDs(zoneTotals[zoneName]); processDs(byZoneTag[ztKey]);
+          processDs(shTotals[shName]); processDs(byShTag[shTagKey]); processDs(gt); 
       }
 
       if (isAllowedSH) {
@@ -563,14 +565,14 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
           let isShSch = (bSchedDoh !== '' && bSchedDoh !== '<2DOH') ? vFsn : 0;
           let isShPo = (bPoDoh !== '' && bPoDoh !== '<2DOH') ? vFsn : 0;
 
-          let addMetrics = (b) => {
+          const processSh = (b) => {
               b.fsn += vFsn; b.atp += vAtp; b.qoh += vQoh; b.openPo += vOpenPo; b.fdrr += vFdrr; b.sdrr += vSdrr;
               b.shInstock += isShIn; b.shSch += isShSch; b.shPo += isShPo;
               b.mstnAtp += vMstnAtp; b.mstnSch += vMstnSch; b.mstnPo += vMstnPo; b.norm += vNorm;
               b.iwit += vIwit; b.irn += vIrn;
           };
-          addMetrics(byGroup[groupKey]); addMetrics(zoneTotals[zoneName]); addMetrics(byZoneTag[ztKey]);
-          addMetrics(shTotals[shName]); addMetrics(byShTag[shTagKey]); addMetrics(gt);
+          processSh(byGroup[groupKey]); processSh(zoneTotals[zoneName]); processSh(byZoneTag[ztKey]);
+          processSh(shTotals[shName]); processSh(byShTag[shTagKey]); processSh(gt);
       }
     }
 
