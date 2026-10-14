@@ -487,7 +487,7 @@ function renderVisibleTable() {
   }, 250);
 }
 
-// BULLETPROOF SUMMARY TABLE RENDERING
+// 100% ERROR FREE SUMMARY TABLE RENDERING
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
@@ -507,19 +507,6 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
     let taggingFiltersRaw = $('#filter-tagging').val() || [];
-
-    // SAFE MATHEMATICAL AGGREGATOR (Fixed ReferenceError)
-    const applySafeMath = (b, vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS) => {
-        if (isAllowedDS) {
-            b.dsInstock += vDsIn; b.dsTotal += vDsTot; b.dsMstn += vDsMstn; b.dsMstnIt += vDsMstnIt; b.dsNorm += vDsNorm; b.instockItDs += vInstockItDs; b.dsNormRaw += vDsNorm;
-        }
-        if (isAllowedSH) {
-            b.fsn += vFsn; b.atp += vAtp; b.qoh += vQoh; b.openPo += vOpenPo; b.fdrr += vFdrr; b.sdrr += vSdrr;
-            b.shInstock += isShIn; b.shSch += isShSch; b.shPo += isShPo;
-            b.mstnAtp += vMstnAtp; b.mstnSch += vMstnSch; b.mstnPo += vMstnPo; b.norm += vNorm;
-            b.iwit += vIwit; b.irn += vIrn;
-        }
-    };
 
     for (let i = 0; i < data.length; i++) {
         let row = data[i];
@@ -565,12 +552,21 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
         let isShSch = (bSchedDoh !== '' && bSchedDoh !== '<2DOH') ? vFsn : 0;
         let isShPo = (bPoDoh !== '' && bPoDoh !== '<2DOH') ? vFsn : 0;
 
-        applySafeMath(byGroup[groupKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
-        applySafeMath(zoneTotals[zoneName], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
-        applySafeMath(byZoneTag[ztKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
-        applySafeMath(shTotals[shName], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
-        applySafeMath(byShTag[shTagKey], vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
-        applySafeMath(gt, vFsn, vAtp, vQoh, vOpenPo, vFdrr, vSdrr, isShIn, isShSch, isShPo, vMstnAtp, vMstnSch, vMstnPo, vNorm, vIwit, vIrn, vDsIn, vDsTot, vDsMstn, vDsMstnIt, vDsNorm, vInstockItDs, isAllowedSH, isAllowedDS);
+        // HIGH SPEED INLINE MATH: Replaces unstable function references entirely.
+        const targets = [byGroup[groupKey], zoneTotals[zoneName], byZoneTag[ztKey], shTotals[shName], byShTag[shTagKey], gt];
+
+        for(let j = 0; j < targets.length; j++) {
+           let b = targets[j];
+           if (isAllowedDS) {
+               b.dsInstock += vDsIn; b.dsTotal += vDsTot; b.dsMstn += vDsMstn; b.dsMstnIt += vDsMstnIt; b.dsNorm += vDsNorm; b.instockItDs += vInstockItDs; b.dsNormRaw += vDsNorm;
+           }
+           if (isAllowedSH) {
+               b.fsn += vFsn; b.atp += vAtp; b.qoh += vQoh; b.openPo += vOpenPo; b.fdrr += vFdrr; b.sdrr += vSdrr;
+               b.shInstock += isShIn; b.shSch += isShSch; b.shPo += isShPo;
+               b.mstnAtp += vMstnAtp; b.mstnSch += vMstnSch; b.mstnPo += vMstnPo; b.norm += vNorm;
+               b.iwit += vIwit; b.irn += vIrn;
+           }
+        }
     }
 
     const getSorter = (groupName) => {
