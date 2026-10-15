@@ -21,6 +21,7 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
+// MAX 100% SAFETY CAP
 const calcPct = (n, d) => d ? Math.min((n / d) * 100, 100) : 0;
 
 const LOSS_REMARK_SEQ = {
@@ -41,6 +42,7 @@ const findCol = (colsObj, namesArray) => {
     return undefined;
 };
 
+// HYGIENE EXPAND/COLLAPSE: Re-aligns sticky columns perfectly on click
 $(document).on('click', 'tr.group-header', function() {
     let zoneSafe = $(this).data('zone');
     let $wrapper = $(this).closest('.dataTables_wrapper');
@@ -67,7 +69,7 @@ function renderGroupCol(d, type, row) {
     if (type !== 'display') return d;
     let content = d;
     
-    // Only shows dropdown arrow if drill-down is enabled (isGroupHeader)
+    // Only shows dropdown arrow if drill-down is enabled
     if (row.isGroupHeader) content = `<i class="bi bi-chevron-down toggle-icon" style="cursor:pointer; margin-right:8px; color:var(--minutes-red);"></i><span style="cursor:pointer; font-weight:700;">` + d + `</span>`;
     else if (row.isChild) content = `<span style="padding-left: 20px; color: #475569;">↳ ` + d + `</span>`;
 
@@ -75,6 +77,7 @@ function renderGroupCol(d, type, row) {
     return `<div style="max-width: 450px; min-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; padding-right: 5px;" title="${rawText}">${content}</div>`;
 }
 
+// FIXED: Parent rows now correctly receive conditional formatting colors!
 function applyColorCoding(td, cellData, rowData) {
   if (rowData.isGrandTotal) return; 
   let pct = parseFloat(cellData); 
@@ -654,7 +657,7 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
     ];
 
     const dtConfig = {
-      columns: columns, deferRender: true, scrollX: true, scrollY: '50vh', scrollCollapse: true, 
+      columns: columns, deferRender: true, destroy: true, scrollX: true, scrollY: '50vh', scrollCollapse: true, 
       fixedColumns: { left: 1 }, dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
       order: [[20, 'asc'], [21, 'asc']], paging: false, 
       createdRow: function (row, data) { 
@@ -677,12 +680,13 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   } catch (err) { console.error("Summary render error", err); }
 }
 
+// BULLET-FAST P1 WITH OPTIONAL DRILL-DOWN
 function buildTableP1(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
     
-    // BULLET-FAST TOGGLE LOGIC: If disabled, skip calculating the heavy child arrays completely.
-    let hasChildren = $('#toggle-drilldown').is(':checked') && activeTabTarget !== 'fsn';
+    // Disable drilldown entirely for FSN and Supercategory to protect performance
+    let hasChildren = $('#toggle-drilldown').is(':checked') && activeTabTarget !== 'fsn' && activeTabTarget !== 'supercategory';
     
     const parentTotals = {}; 
     const childTotals = {}; 
@@ -746,8 +750,11 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
       if (!parentTotals[pKey]) { parentTotals[pKey] = { groupKey: pKey, totalFsns: 0, dsInstock: 0, dsTotal: 0, remarks: {} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => parentTotals[pKey].remarks[k] = 0); }
       
-      let pcKey = cKey ? pKey + '|||' + cKey : null;
-      if (pcKey && !childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey, totalFsns: 0, dsInstock: 0, dsTotal: 0, remarks: {} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => childTotals[pcKey].remarks[k] = 0); }
+      let pcKey = null;
+      if (hasChildren && cKey) {
+          pcKey = pKey + '|||' + cKey;
+          if (!childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey, totalFsns: 0, dsInstock: 0, dsTotal: 0, remarks: {} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => childTotals[pcKey].remarks[k] = 0); }
+      }
 
       if (isAllowedDS) { 
           parentTotals[pKey].dsInstock += dsInstock; parentTotals[pKey].dsTotal += dsTotal; 
@@ -801,10 +808,12 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
     let columns = [ { data: 'is_gt', visible: false, searchable: false }, { title: groupColName, data: 'group', render: renderGroupCol }, { title: "SH Total FSNs", data: 'total', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }, { title: "DS Instock %", data: 'dsInstockPct', type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: applyColorCoding } ];
     const sortedRemarks = Object.keys(LOSS_REMARK_SEQ).sort((a,b) => LOSS_REMARK_SEQ[a] - LOSS_REMARK_SEQ[b]);
+    
+    // Explicitly passes applyColorCoding so that parent rows are correctly colored
     sortedRemarks.forEach(remark => { columns.push({ title: remark === 'Instock' ? 'SH Instock %' : remark, data: remark, type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: function (td, cellData, rowData) { if (remark === 'Instock') applyColorCoding(td, cellData, rowData); else if (!rowData.isGrandTotal && cellData > 15) { td.style.color = '#b91c1c'; td.style.fontWeight = '700'; } } }); });
 
     $('#' + tableId).DataTable({
-      data: tableData, columns: columns, deferRender: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
+      data: tableData, columns: columns, deferRender: true, destroy: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
       orderFixed: [0, 'asc'], order: hasChildren ? [] : [[3, 'desc']], 
       paging: !hasChildren, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
       createdRow: function (row, data) { 
@@ -826,7 +835,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 function buildTableP2(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
-    let hasChildren = $('#toggle-drilldown').is(':checked') && activeTabTarget !== 'fsn';
+    let hasChildren = $('#toggle-drilldown').is(':checked') && activeTabTarget !== 'fsn' && activeTabTarget !== 'supercategory';
     
     const uniqueDates = GLOBAL_DATES;
     const latestDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
@@ -875,8 +884,11 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
 
       if (!parentTotals[pKey]) { parentTotals[pKey] = {}; uniqueDates.forEach(d => parentTotals[pKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
       
-      let pcKey = cKey ? pKey + '|||' + cKey : null;
-      if (pcKey && !childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey }; uniqueDates.forEach(d => childTotals[pcKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
+      let pcKey = null;
+      if (hasChildren && cKey) {
+          pcKey = pKey + '|||' + cKey;
+          if (!childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey }; uniqueDates.forEach(d => childTotals[pcKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
+      }
       
       if (isAllowedSH && uniqueDates.includes(reportDate)) {
           parentTotals[pKey][reportDate].shTotal += countFSN; 
@@ -954,7 +966,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     });
 
     $('#' + tableId).DataTable({
-      data: tableData, columns: columns, deferRender: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, 
+      data: tableData, columns: columns, deferRender: true, destroy: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, 
       dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
       orderFixed: [0, 'asc'], order: [], 
       paging: !hasChildren, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
@@ -977,7 +989,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
 function buildTableP3(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
-    let hasChildren = $('#toggle-drilldown').is(':checked') && activeTabTarget !== 'fsn';
+    let hasChildren = $('#toggle-drilldown').is(':checked') && activeTabTarget !== 'fsn' && activeTabTarget !== 'supercategory';
     
     const latestDate = GLOBAL_DATES.length > 0 ? GLOBAL_DATES[GLOBAL_DATES.length - 1] : null;
     const uniqueDates = [...GLOBAL_DATES].reverse(); 
@@ -1028,8 +1040,11 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
 
       if (!parentTotals[pKey]) { parentTotals[pKey] = {}; uniqueDates.forEach(d => parentTotals[pKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
       
-      let pcKey = cKey ? pKey + '|||' + cKey : null;
-      if (pcKey && !childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey }; uniqueDates.forEach(d => childTotals[pcKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
+      let pcKey = null;
+      if (hasChildren && cKey) {
+          pcKey = pKey + '|||' + cKey;
+          if (!childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey }; uniqueDates.forEach(d => childTotals[pcKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
+      }
 
       if (isAllowedSH && uniqueDates.includes(reportDate)) {
           let valAtp = Number(row[idxMstnAtp]) || 0, valSch = Number(row[idxMstnSch]) || 0, valPo  = Number(row[idxMstnPo]) || 0;
@@ -1094,7 +1109,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     });
 
     $('#' + tableId).DataTable({
-      data: tableData, columns: columns, deferRender: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, 
+      data: tableData, columns: columns, deferRender: true, destroy: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, 
       dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
       orderFixed: [0, 'asc'], order: [], 
       paging: !hasChildren, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
