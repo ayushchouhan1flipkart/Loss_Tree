@@ -21,7 +21,6 @@ let progressTimer = setInterval(() => {
 
 const SAFE_DOM = '<"row"<"col-12"Q>><"row align-items-end"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>';
 
-// MAX 100% SAFETY CAP
 const calcPct = (n, d) => d ? Math.min((n / d) * 100, 100) : 0;
 
 const LOSS_REMARK_SEQ = {
@@ -42,23 +41,35 @@ const findCol = (colsObj, namesArray) => {
     return undefined;
 };
 
+// PERFECT HYGIENE EXPAND/COLLAPSE HANDLER
 $(document).on('click', 'tr.group-header', function() {
     let zoneSafe = $(this).data('zone');
     let $wrapper = $(this).closest('.dataTables_wrapper');
     let $children = $wrapper.find('tr.child-of-' + zoneSafe);
-    if ($(this).hasClass('collapsed')) { $(this).removeClass('collapsed'); $children.show(); } 
-    else { $(this).addClass('collapsed'); $children.hide(); }
+    
+    if ($(this).hasClass('collapsed')) { 
+        $(this).removeClass('collapsed'); 
+        $children.show(); 
+    } else { 
+        $(this).addClass('collapsed'); 
+        $children.hide(); 
+    }
+    
+    // Force DataTables to recalculate heights so the sticky column NEVER misaligns
     let tableId = $wrapper.find('table.dataTable').attr('id');
     if (tableId && $.fn.DataTable.isDataTable('#' + tableId)) {
-        setTimeout(() => { $('#' + tableId).DataTable().fixedColumns().relayout(); }, 50);
+        setTimeout(() => { 
+            let table = $('#' + tableId).DataTable();
+            table.columns.adjust().fixedColumns().relayout();
+        }, 10);
     }
 });
 
 function renderGroupCol(d, type, row) {
     if (type !== 'display') return d;
     let content = d;
-    if (row.isGroupHeader) content = `<i class="bi bi-chevron-down toggle-icon"></i><span>` + d + `</span>`;
-    else if (row.isChild) content = `<span class="child-indent"></span>` + d;
+    if (row.isGroupHeader) content = `<i class="bi bi-chevron-down toggle-icon" style="cursor:pointer; margin-right:8px; color:var(--minutes-red);"></i><span style="cursor:pointer; font-weight:700;">` + d + `</span>`;
+    else if (row.isChild) content = `<span style="padding-left: 20px; color: #475569;">↳ ` + d + `</span>`;
 
     let rawText = d ? String(d).replace(/"/g, '&quot;') : '';
     return `<div style="max-width: 450px; min-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; padding-right: 5px;" title="${rawText}">${content}</div>`;
@@ -487,7 +498,6 @@ function renderVisibleTable() {
   }, 250);
 }
 
-// 100% ERROR FREE SUMMARY TABLE RENDERING: Uses safe array loops.
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
@@ -552,7 +562,6 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
         let isShSch = (bSchedDoh !== '' && bSchedDoh !== '<2DOH') ? vFsn : 0;
         let isShPo = (bPoDoh !== '' && bPoDoh !== '<2DOH') ? vFsn : 0;
 
-        // SAFE MATHEMATICS LOOP (Bypasses the strict compiler reference error)
         let targets = [byGroup[groupKey], zoneTotals[zoneName], byZoneTag[ztKey], shTotals[shName], byShTag[shTagKey], gt];
 
         for(let j = 0; j < targets.length; j++) {
@@ -648,8 +657,8 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       order: [[20, 'asc'], [21, 'asc']], paging: false, 
       createdRow: function (row, data) { 
           if (data.isGrandTotal) $(row).addClass('total-row'); 
-          else if (data.isGroupHeader) { $(row).addClass('group-header'); $(row).attr('data-zone', data.zoneSafe); }
-          else if (data.isChild) { $(row).addClass('child-row child-of-' + data.zoneSafe); }
+          else if (data.isGroupHeader) { $(row).addClass('group-header collapsed'); $(row).attr('data-zone', data.zoneSafe); }
+          else if (data.isChild) { $(row).addClass('child-row child-of-' + data.zoneSafe).hide(); }
       },
       drawCallback: function(settings) {
           var api = this.api(); var $body = $(api.table().body()); var parents = $body.find('tr.group-header');
@@ -666,31 +675,50 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   } catch (err) { console.error("Summary render error", err); }
 }
 
+// 100% BULLETPROOF P1 WITH UNIVERSAL DROPDOWNS
 function buildTableP1(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
-    const byGroup = {}; const shToZone = {}; let grandTotalFsns = 0, grandTotalDSInstock = 0, grandTotalDSTotal = 0; let grandTotalRemarks = {};
+    let hasChildren = activeTabTarget !== 'fsn';
     
+    const parentTotals = {}; 
+    const childTotals = {}; 
+    let grandTotalFsns = 0, grandTotalDSInstock = 0, grandTotalDSTotal = 0; 
+    let grandTotalRemarks = {};
+
     let gColIdx = findCol(colIdxP1, [groupCol]);
-    let rIdx = findCol(colIdxP1, ['Loss_Remark']), fsnIdx = findCol(colIdxP1, ['FSN_Count']);
-    let dsiIdx = findCol(colIdxP1, ['Instock_DS_Count']), dstIdx = findCol(colIdxP1, ['Total_DS_Count']), bnIdx = findCol(colIdxP1, ['Buying_Node_Flag']);
+    let rIdx = findCol(colIdxP1, ['Loss_Remark']);
+    let fsnIdx = findCol(colIdxP1, ['FSN_Count']);
+    let dsiIdx = findCol(colIdxP1, ['Instock_DS_Count']);
+    let dstIdx = findCol(colIdxP1, ['Total_DS_Count']);
+    let bnIdx = findCol(colIdxP1, ['Buying_Node_Flag']);
     let zIdx = findCol(colIdxP1, ['Zone']);
+    let shIdx = findCol(colIdxP1, ['FC_Code']);
     let titleIdx = findCol(colIdxP1, ['Title', 'Product_Title']);
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toLowerCase().trim());
 
     Object.keys(LOSS_REMARK_SEQ).forEach(k => grandTotalRemarks[k] = 0);
+    
     for (let i = 0; i < data.length; i++) {
       let row = data[i];
-      let groupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let baseGroupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
       
-      let finalGroupKey = groupKey;
-      if (groupColName === 'FSN' && titleIdx !== undefined) {
-          finalGroupKey = finalGroupKey + ' - ' + (row[titleIdx] || 'Unknown');
+      let pKey = baseGroupKey;
+      if (activeTabTarget === 'fsn' && titleIdx !== undefined) {
+          pKey += ' - ' + (row[titleIdx] || 'Unknown');
       }
 
-      if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
+      let cKey = null;
+      if (hasChildren) {
+          if (isShLevel) {
+              pKey = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
+              cKey = baseGroupKey;
+          } else {
+              cKey = shIdx !== undefined ? (row[shIdx] || 'Unknown').toString().trim() : 'Unknown';
+          }
+      }
 
       const rawRemark = String(row[rIdx] || '').trim().toLowerCase();
       let remark = 'Other Loss';
@@ -713,52 +741,74 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; } 
       else { let matchesFilter = mappedBnFilters.includes(buyNode); isAllowedSH = matchesFilter; isAllowedDS = matchesFilter; }
 
-      if (!byGroup[finalGroupKey]) { byGroup[finalGroupKey] = { groupKey: finalGroupKey, totalFsns: 0, dsInstock: 0, dsTotal: 0, remarks: {} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => byGroup[finalGroupKey].remarks[k] = 0); }
-      if (isAllowedDS) { byGroup[finalGroupKey].dsInstock += dsInstock; byGroup[finalGroupKey].dsTotal += dsTotal; grandTotalDSInstock += dsInstock; grandTotalDSTotal += dsTotal; }
-      if (isAllowedSH) { byGroup[finalGroupKey].totalFsns += fsns; grandTotalFsns += fsns; if (byGroup[finalGroupKey].remarks[remark] !== undefined) { byGroup[finalGroupKey].remarks[remark] += fsns; grandTotalRemarks[remark] += fsns; } else { byGroup[finalGroupKey].remarks['Other Loss'] += fsns; grandTotalRemarks['Other Loss'] += fsns; } }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = { groupKey: pKey, totalFsns: 0, dsInstock: 0, dsTotal: 0, remarks: {} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => parentTotals[pKey].remarks[k] = 0); }
+      
+      let pcKey = cKey ? pKey + '|||' + cKey : null;
+      if (pcKey && !childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey, totalFsns: 0, dsInstock: 0, dsTotal: 0, remarks: {} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => childTotals[pcKey].remarks[k] = 0); }
+
+      if (isAllowedDS) { 
+          parentTotals[pKey].dsInstock += dsInstock; parentTotals[pKey].dsTotal += dsTotal; 
+          if(pcKey) { childTotals[pcKey].dsInstock += dsInstock; childTotals[pcKey].dsTotal += dsTotal; }
+          grandTotalDSInstock += dsInstock; grandTotalDSTotal += dsTotal; 
+      }
+      if (isAllowedSH) { 
+          parentTotals[pKey].totalFsns += fsns; 
+          if (parentTotals[pKey].remarks[remark] !== undefined) parentTotals[pKey].remarks[remark] += fsns; 
+          else parentTotals[pKey].remarks['Other Loss'] += fsns;
+
+          if(pcKey) { 
+              childTotals[pcKey].totalFsns += fsns; 
+              if (childTotals[pcKey].remarks[remark] !== undefined) childTotals[pcKey].remarks[remark] += fsns; 
+              else childTotals[pcKey].remarks['Other Loss'] += fsns;
+          }
+          
+          grandTotalFsns += fsns; 
+          if (grandTotalRemarks[remark] !== undefined) grandTotalRemarks[remark] += fsns;
+          else grandTotalRemarks['Other Loss'] += fsns;
+      }
     }
 
     const tableData = [];
     if (grandTotalFsns > 0 || grandTotalDSTotal > 0) {
       let gtRow = { is_gt: 0, group: 'GRAND TOTAL', total: grandTotalFsns, dsInstockPct: calcPct(grandTotalDSInstock, grandTotalDSTotal), isGrandTotal: true };
-      Object.keys(LOSS_REMARK_SEQ).forEach(remark => { gtRow[remark] = calcPct(grandTotalRemarks[remark], grandTotalFsns); }); tableData.push(gtRow);
+      Object.keys(LOSS_REMARK_SEQ).forEach(rem => { gtRow[rem] = calcPct(grandTotalRemarks[rem], grandTotalFsns); }); 
+      tableData.push(gtRow);
     }
 
-    if (isShLevel) {
-        const zoneTotals = {};
-        Object.keys(byGroup).forEach(sh => {
-            let z = shToZone[sh];
-            if(!zoneTotals[z]) { zoneTotals[z] = { totalFsns:0, dsInstock:0, dsTotal:0, remarks:{} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => zoneTotals[z].remarks[k] = 0); }
-            zoneTotals[z].totalFsns += byGroup[sh].totalFsns; zoneTotals[z].dsInstock += byGroup[sh].dsInstock; zoneTotals[z].dsTotal += byGroup[sh].dsTotal;
-            Object.keys(LOSS_REMARK_SEQ).forEach(rem => zoneTotals[z].remarks[rem] += byGroup[sh].remarks[rem]);
-        });
-        Object.keys(zoneTotals).sort().forEach(z => {
-            let zSafe = z.replace(/[^a-zA-Z0-9]/g, '');
-            let zRow = { is_gt: 1, group: z, total: zoneTotals[z].totalFsns, dsInstockPct: calcPct(zoneTotals[z].dsInstock, zoneTotals[z].dsTotal), isGrandTotal: false, isGroupHeader: true, zoneSafe: zSafe };
-            Object.keys(LOSS_REMARK_SEQ).forEach(rem => zRow[rem] = calcPct(zoneTotals[z].remarks[rem], zoneTotals[z].totalFsns)); tableData.push(zRow);
-            Object.keys(byGroup).sort().forEach(sh => {
-                if(shToZone[sh] === z) {
-                    let cRow = { is_gt: 1, group: sh, total: byGroup[sh].totalFsns, dsInstockPct: calcPct(byGroup[sh].dsInstock, byGroup[sh].dsTotal), isGrandTotal: false, isChild: true, zoneSafe: zSafe };
-                    Object.keys(LOSS_REMARK_SEQ).forEach(rem => cRow[rem] = calcPct(byGroup[sh].remarks[rem], byGroup[sh].totalFsns)); tableData.push(cRow);
+    Object.keys(parentTotals).sort().forEach(p => {
+        let pSafe = 'p_' + p.replace(/[^a-zA-Z0-9]/g, '');
+        let pRow = { is_gt: 1, group: p, total: parentTotals[p].totalFsns, dsInstockPct: calcPct(parentTotals[p].dsInstock, parentTotals[p].dsTotal), isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe };
+        Object.keys(LOSS_REMARK_SEQ).forEach(rem => pRow[rem] = calcPct(parentTotals[p].remarks[rem], parentTotals[p].totalFsns)); 
+        tableData.push(pRow);
+
+        if (hasChildren) {
+            let childrenRows = [];
+            Object.keys(childTotals).forEach(pcKey => {
+                if (pcKey.startsWith(p + '|||')) {
+                    let cObj = childTotals[pcKey];
+                    let cRow = { is_gt: 1, group: cObj.groupKey, total: cObj.totalFsns, dsInstockPct: calcPct(cObj.dsInstock, cObj.dsTotal), isGrandTotal: false, isChild: true, zoneSafe: pSafe };
+                    Object.keys(LOSS_REMARK_SEQ).forEach(rem => cRow[rem] = calcPct(cObj.remarks[rem], cObj.totalFsns));
+                    childrenRows.push(cRow);
                 }
             });
-        });
-    } else {
-        Object.values(byGroup).forEach(group => {
-          let rowData = { is_gt: 1, group: group.groupKey, total: group.totalFsns, dsInstockPct: calcPct(group.dsInstock, group.dsTotal), isGrandTotal: false };
-          Object.keys(LOSS_REMARK_SEQ).forEach(remark => { rowData[remark] = calcPct(group.remarks[remark], group.totalFsns); }); tableData.push(rowData);
-        });
-    }
+            childrenRows.sort((a,b) => b.total - a.total); 
+            childrenRows.forEach(c => tableData.push(c));
+        }
+    });
 
-    let columns = [ { title: "GT", data: 'is_gt', visible: false, searchable: false }, { title: groupColName, data: 'group', render: renderGroupCol }, { title: "SH Total FSNs", data: 'total', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }, { title: "DS Instock %", data: 'dsInstockPct', type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: applyColorCoding } ];
+    let columns = [ { data: 'is_gt', visible: false, searchable: false }, { title: groupColName, data: 'group', render: renderGroupCol }, { title: "SH Total FSNs", data: 'total', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }, { title: "DS Instock %", data: 'dsInstockPct', type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: applyColorCoding } ];
     const sortedRemarks = Object.keys(LOSS_REMARK_SEQ).sort((a,b) => LOSS_REMARK_SEQ[a] - LOSS_REMARK_SEQ[b]);
     sortedRemarks.forEach(remark => { columns.push({ title: remark === 'Instock' ? 'SH Instock %' : remark, data: remark, type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: function (td, cellData, rowData) { if (remark === 'Instock') applyColorCoding(td, cellData, rowData); else if (!rowData.isGrandTotal && !rowData.isGroupHeader && cellData > 15) { td.style.color = '#b91c1c'; td.style.fontWeight = '700'; } } }); });
 
     $('#' + tableId).DataTable({
       data: tableData, columns: columns, deferRender: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
-      orderFixed: [0, 'asc'], order: isShLevel ? [] : [[3, 'desc']], 
-      paging: isShLevel ? false : true, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
-      createdRow: function (row, data) { if (data.isGrandTotal) $(row).addClass('total-row'); else if (data.isGroupHeader) { $(row).addClass('group-header'); $(row).attr('data-zone', data.zoneSafe); } else if (data.isChild) { $(row).addClass('child-row child-of-' + data.zoneSafe); } },
+      orderFixed: [0, 'asc'], order: hasChildren ? [] : [[3, 'desc']], 
+      paging: !hasChildren, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
+      createdRow: function (row, data) { 
+          if (data.isGrandTotal) $(row).addClass('total-row'); 
+          else if (data.isGroupHeader) { $(row).addClass('group-header collapsed'); $(row).attr('data-zone', data.zoneSafe); } 
+          else if (data.isChild) { $(row).addClass('child-row child-of-' + data.zoneSafe).hide(); } 
+      },
       drawCallback: function(settings) {
           var api = this.api(); var $body = $(api.table().body()); var parents = $body.find('tr.group-header');
           parents.each(function() {
@@ -773,16 +823,19 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 function buildTableP2(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
+    let hasChildren = activeTabTarget !== 'fsn';
+    
     const uniqueDates = GLOBAL_DATES;
     const latestDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
     
-    const byGroup = {}; const shToZone = {}; let grandTotalByDate = {};
+    const parentTotals = {}; const childTotals = {}; let grandTotalByDate = {};
     uniqueDates.forEach(d => grandTotalByDate[d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 });
 
     let gColIdx = findCol(colIdxP2, [groupCol]);
     let rDateIdx = findCol(colIdxP2, ['Report_Date']), remIdx = findCol(colIdxP2, ['Loss_Remark']);
     let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']), fsnIdx = findCol(colIdxP2, ['FSN_Count']), tdIdx = findCol(colIdxP2, ['Total_DS_Count']), idiIdx = findCol(colIdxP2, ['Instock_DS_Count']);
     let zIdx = findCol(colIdxP2, ['Zone']);
+    let shIdx = findCol(colIdxP2, ['FC_Code']);
     let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
@@ -790,15 +843,21 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
 
     for (let i = 0; i < data.length; i++) {
       let row = data[i];
-      let groupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let baseGroupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
       let reportDate = String(row[rDateIdx] || 'Unknown');
       
-      let finalGroupKey = groupKey;
-      if (groupColName === 'FSN' && titleIdx !== undefined) {
-          finalGroupKey = finalGroupKey + ' - ' + (row[titleIdx] || 'Unknown');
+      let pKey = baseGroupKey;
+      if (activeTabTarget === 'fsn' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
+      
+      let cKey = null;
+      if (hasChildren) {
+          if (isShLevel) {
+              pKey = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
+              cKey = baseGroupKey;
+          } else {
+              cKey = shIdx !== undefined ? (row[shIdx] || 'Unknown').toString().trim() : 'Unknown';
+          }
       }
-
-      if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
 
       const remark = String(row[remIdx] || '').trim().toLowerCase(), buyNode = String(row[buyIdx] || '').trim().toLowerCase();
       const countFSN = Number(row[fsnIdx]) || 0;
@@ -811,15 +870,31 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; } 
       else { let matchesFilter = mappedBnFilters.includes(buyNode); isAllowedSH = matchesFilter; isAllowedDS = matchesFilter; }
 
-      if (!byGroup[finalGroupKey]) { byGroup[finalGroupKey] = { groupKey: finalGroupKey }; uniqueDates.forEach(d => byGroup[finalGroupKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = {}; uniqueDates.forEach(d => parentTotals[pKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
+      
+      let pcKey = cKey ? pKey + '|||' + cKey : null;
+      if (pcKey && !childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey }; uniqueDates.forEach(d => childTotals[pcKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
       
       if (isAllowedSH && uniqueDates.includes(reportDate)) {
-          byGroup[finalGroupKey][reportDate].shTotal += countFSN; grandTotalByDate[reportDate].shTotal += countFSN;
-          if (remark === 'instock') { byGroup[finalGroupKey][reportDate].shInstock += countFSN; grandTotalByDate[reportDate].shInstock += countFSN; }
+          parentTotals[pKey][reportDate].shTotal += countFSN; 
+          if (pcKey) childTotals[pcKey][reportDate].shTotal += countFSN;
+          grandTotalByDate[reportDate].shTotal += countFSN;
+
+          if (remark === 'instock') { 
+              parentTotals[pKey][reportDate].shInstock += countFSN; 
+              if (pcKey) childTotals[pcKey][reportDate].shInstock += countFSN;
+              grandTotalByDate[reportDate].shInstock += countFSN; 
+          }
       }
       if (isAllowedDS && uniqueDates.includes(reportDate)) {
-          byGroup[finalGroupKey][reportDate].dsTotal += countTotalDS; byGroup[finalGroupKey][reportDate].dsInstock += countInstockDS;
-          grandTotalByDate[reportDate].dsTotal += countTotalDS; grandTotalByDate[reportDate].dsInstock += countInstockDS;
+          parentTotals[pKey][reportDate].dsTotal += countTotalDS; 
+          parentTotals[pKey][reportDate].dsInstock += countInstockDS;
+          if (pcKey) { 
+              childTotals[pcKey][reportDate].dsTotal += countTotalDS; 
+              childTotals[pcKey][reportDate].dsInstock += countInstockDS; 
+          }
+          grandTotalByDate[reportDate].dsTotal += countTotalDS; 
+          grandTotalByDate[reportDate].dsInstock += countInstockDS;
       }
     }
 
@@ -836,43 +911,29 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     });
     if(gtHasData) tableData.push(gtRow);
 
-    if (isShLevel) {
-        const zoneTotals = {};
-        Object.keys(byGroup).forEach(sh => {
-            let z = shToZone[sh];
-            if(!zoneTotals[z]) { zoneTotals[z] = {}; uniqueDates.forEach(d => zoneTotals[z][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
-            uniqueDates.forEach(d => { zoneTotals[z][d].shTotal += byGroup[sh][d].shTotal; zoneTotals[z][d].shInstock += byGroup[sh][d].shInstock; zoneTotals[z][d].dsTotal += byGroup[sh][d].dsTotal; zoneTotals[z][d].dsInstock += byGroup[sh][d].dsInstock; });
-        });
-        Object.keys(zoneTotals).sort().forEach(z => {
-            let zSafe = z.replace(/[^a-zA-Z0-9]/g, '');
-            let zRow = { is_gt: 1, group: z, isGrandTotal: false, isGroupHeader: true, zoneSafe: zSafe, latestTotalFSNs: latestDate ? zoneTotals[z][latestDate].shTotal : 0, latestDSLoss: latestDate ? (zoneTotals[z][latestDate].dsTotal - zoneTotals[z][latestDate].dsInstock) : 0 };
-            uniqueDates.forEach(d => { zRow[d+'_sh'] = calcPct(zoneTotals[z][d].shInstock, zoneTotals[z][d].shTotal); zRow[d+'_ds'] = calcPct(zoneTotals[z][d].dsInstock, zoneTotals[z][d].dsTotal); });
-            tableData.push(zRow);
-            Object.keys(byGroup).sort().forEach(sh => {
-                if(shToZone[sh] === z) {
-                    let cRow = { is_gt: 1, group: sh, isGrandTotal: false, isChild: true, zoneSafe: zSafe, latestTotalFSNs: latestDate ? byGroup[sh][latestDate].shTotal : 0, latestDSLoss: latestDate ? (byGroup[sh][latestDate].dsTotal - byGroup[sh][latestDate].dsInstock) : 0 };
-                    uniqueDates.forEach(d => { cRow[d+'_sh'] = calcPct(byGroup[sh][d].shInstock, byGroup[sh][d].shTotal); cRow[d+'_ds'] = calcPct(byGroup[sh][d].dsInstock, byGroup[sh][d].dsTotal); });
-                    tableData.push(cRow);
+    Object.keys(parentTotals).sort().forEach(p => {
+        let pSafe = 'p_' + p.replace(/[^a-zA-Z0-9]/g, '');
+        let pRow = { is_gt: 1, group: p, isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe, latestTotalFSNs: latestDate ? parentTotals[p][latestDate].shTotal : 0, latestDSLoss: latestDate ? (parentTotals[p][latestDate].dsTotal - parentTotals[p][latestDate].dsInstock) : 0 };
+        uniqueDates.forEach(d => { pRow[d+'_sh'] = calcPct(parentTotals[p][d].shInstock, parentTotals[p][d].shTotal); pRow[d+'_ds'] = calcPct(parentTotals[p][d].dsInstock, parentTotals[p][d].dsTotal); });
+        tableData.push(pRow);
+
+        if (hasChildren) {
+            let childrenRows = [];
+            Object.keys(childTotals).forEach(pcKey => {
+                if (pcKey.startsWith(p + '|||')) {
+                    let cObj = childTotals[pcKey];
+                    let cRow = { is_gt: 1, group: cObj.groupKey, isGrandTotal: false, isChild: true, zoneSafe: pSafe, latestTotalFSNs: latestDate ? cObj[latestDate].shTotal : 0, latestDSLoss: latestDate ? (cObj[latestDate].dsTotal - cObj[latestDate].dsInstock) : 0 };
+                    uniqueDates.forEach(d => { cRow[d+'_sh'] = calcPct(cObj[d].shInstock, cObj[d].shTotal); cRow[d+'_ds'] = calcPct(cObj[d].dsInstock, cObj[d].dsTotal); });
+                    childrenRows.push(cRow);
                 }
             });
-        });
-    } else {
-        Object.values(byGroup).forEach(groupObj => {
-          let rowData = { is_gt: 1, group: groupObj.groupKey, isGrandTotal: false }, rowHasData = false;
-          rowData['latestTotalFSNs'] = latestDate ? groupObj[latestDate].shTotal : 0;
-          rowData['latestDSLoss'] = latestDate ? (groupObj[latestDate].dsTotal - groupObj[latestDate].dsInstock) : 0;
-
-          uniqueDates.forEach(d => {
-            if (groupObj[d].shTotal > 0 || groupObj[d].dsTotal > 0) rowHasData = true;
-            rowData[d + '_sh'] = calcPct(groupObj[d].shInstock, groupObj[d].shTotal);
-            rowData[d + '_ds'] = calcPct(groupObj[d].dsInstock, groupObj[d].dsTotal);
-          });
-          if(rowHasData) tableData.push(rowData);
-        });
-    }
+            childrenRows.sort((a,b) => b.latestTotalFSNs - a.latestTotalFSNs);
+            childrenRows.forEach(c => tableData.push(c));
+        }
+    });
 
     let columns = [
-      { title: "GT", data: 'is_gt', visible: false, searchable: false },
+      { data: 'is_gt', visible: false, searchable: false },
       { title: groupColName, data: 'group', render: renderGroupCol },
       { title: "Total FSNs (Latest SH)", data: 'latestTotalFSNs', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
       { title: "Latest DS Loss", data: 'latestDSLoss', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }
@@ -893,11 +954,11 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       data: tableData, columns: columns, deferRender: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, 
       dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
       orderFixed: [0, 'asc'], order: [], 
-      paging: isShLevel ? false : true, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
+      paging: !hasChildren, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
       createdRow: function (row, data) { 
           if (data.isGrandTotal) $(row).addClass('total-row'); 
-          else if (data.isGroupHeader) { $(row).addClass('group-header'); $(row).attr('data-zone', data.zoneSafe); }
-          else if (data.isChild) { $(row).addClass('child-row child-of-' + data.zoneSafe); }
+          else if (data.isGroupHeader) { $(row).addClass('group-header collapsed'); $(row).attr('data-zone', data.zoneSafe); }
+          else if (data.isChild) { $(row).addClass('child-row child-of-' + data.zoneSafe).hide(); }
       },
       drawCallback: function(settings) {
           var api = this.api(); var $body = $(api.table().body()); var parents = $body.find('tr.group-header');
@@ -913,10 +974,12 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
 function buildTableP3(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
+    let hasChildren = activeTabTarget !== 'fsn';
+    
     const latestDate = GLOBAL_DATES.length > 0 ? GLOBAL_DATES[GLOBAL_DATES.length - 1] : null;
     const uniqueDates = [...GLOBAL_DATES].reverse(); 
-    const byGroup = {}; const shToZone = {}; let grandTotalByDate = {};
     
+    const parentTotals = {}; const childTotals = {}; let grandTotalByDate = {};
     uniqueDates.forEach(d => grandTotalByDate[d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 });
 
     let gColIdx = findCol(colIdxP2, [groupCol]);
@@ -924,6 +987,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']);
     let fsnIdx = findCol(colIdxP2, ['FSN_Count']);
     let zIdx = findCol(colIdxP2, ['Zone']);
+    let shIdx = findCol(colIdxP2, ['FC_Code']);
     let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
     
     let idxMstnAtp = findCol(colIdxP2, ['MSTN_atp']);
@@ -936,16 +1000,22 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
 
     for (let i = 0; i < data.length; i++) {
       let row = data[i];
-      let groupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let baseGroupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
       let reportDate = String(row[rDateIdx] || 'Unknown');
       
-      let finalGroupKey = groupKey;
-      if (groupColName === 'FSN' && titleIdx !== undefined) {
-          finalGroupKey = finalGroupKey + ' - ' + (row[titleIdx] || 'Unknown');
+      let pKey = baseGroupKey;
+      if (activeTabTarget === 'fsn' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
+      
+      let cKey = null;
+      if (hasChildren) {
+          if (isShLevel) {
+              pKey = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
+              cKey = baseGroupKey;
+          } else {
+              cKey = shIdx !== undefined ? (row[shIdx] || 'Unknown').toString().trim() : 'Unknown';
+          }
       }
 
-      if (isShLevel) shToZone[finalGroupKey] = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
-      
       const buyNode = String(row[buyIdx] || '').trim().toLowerCase();
       const countFSN = Number(row[fsnIdx]) || 0;
 
@@ -953,11 +1023,11 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
       if (bnFiltersRaw.length === 0) isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true');
       else isAllowedSH = mappedBnFilters.includes(buyNode);
 
-      if (!byGroup[finalGroupKey]) {
-        byGroup[finalGroupKey] = { groupKey: finalGroupKey };
-        uniqueDates.forEach(d => byGroup[finalGroupKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 });
-      }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = {}; uniqueDates.forEach(d => parentTotals[pKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
       
+      let pcKey = cKey ? pKey + '|||' + cKey : null;
+      if (pcKey && !childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey }; uniqueDates.forEach(d => childTotals[pcKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
+
       if (isAllowedSH && uniqueDates.includes(reportDate)) {
           let valAtp = Number(row[idxMstnAtp]) || 0, valSch = Number(row[idxMstnSch]) || 0, valPo  = Number(row[idxMstnPo]) || 0;
           let valNorm = Number(row[idxNorm]) || 0;
@@ -966,7 +1036,9 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
           if (valSch > valNorm) valNorm = valSch;
           if (valPo > valNorm) valNorm = valPo;
 
-          byGroup[finalGroupKey][reportDate].atp += valAtp; byGroup[finalGroupKey][reportDate].sch += valSch; byGroup[finalGroupKey][reportDate].po += valPo; byGroup[finalGroupKey][reportDate].norm += valNorm; byGroup[finalGroupKey][reportDate].shTotal += countFSN;
+          parentTotals[pKey][reportDate].atp += valAtp; parentTotals[pKey][reportDate].sch += valSch; parentTotals[pKey][reportDate].po += valPo; parentTotals[pKey][reportDate].norm += valNorm; parentTotals[pKey][reportDate].shTotal += countFSN;
+          if (pcKey) { childTotals[pcKey][reportDate].atp += valAtp; childTotals[pcKey][reportDate].sch += valSch; childTotals[pcKey][reportDate].po += valPo; childTotals[pcKey][reportDate].norm += valNorm; childTotals[pcKey][reportDate].shTotal += countFSN; }
+          
           grandTotalByDate[reportDate].atp += valAtp; grandTotalByDate[reportDate].sch += valSch; grandTotalByDate[reportDate].po += valPo; grandTotalByDate[reportDate].norm += valNorm; grandTotalByDate[reportDate].shTotal += countFSN;
       }
     }
@@ -985,43 +1057,29 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     });
     if(gtHasData) tableData.push(gtRow);
 
-    if (isShLevel) {
-        const zoneTotals = {};
-        Object.keys(byGroup).forEach(sh => {
-            let z = shToZone[sh];
-            if(!zoneTotals[z]) { zoneTotals[z] = {}; uniqueDates.forEach(d => zoneTotals[z][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
-            uniqueDates.forEach(d => { zoneTotals[z][d].atp += byGroup[sh][d].atp; zoneTotals[z][d].sch += byGroup[sh][d].sch; zoneTotals[z][d].po += byGroup[sh][d].po; zoneTotals[z][d].norm += byGroup[sh][d].norm; zoneTotals[z][d].shTotal += byGroup[sh][d].shTotal; });
-        });
-        Object.keys(zoneTotals).sort().forEach(z => {
-            let zSafe = z.replace(/[^a-zA-Z0-9]/g, '');
-            let zRow = { is_gt: 1, group: z, isGrandTotal: false, isGroupHeader: true, zoneSafe: zSafe, latestTotalFSNs: latestDate ? zoneTotals[z][latestDate].shTotal : 0 };
-            uniqueDates.forEach(d => { zRow[d+'_atp'] = calcPct(zoneTotals[z][d].atp, zoneTotals[z][d].norm); zRow[d+'_sch'] = calcPct(zoneTotals[z][d].sch, zoneTotals[z][d].norm); zRow[d+'_po'] = calcPct(zoneTotals[z][d].po, zoneTotals[z][d].norm); });
-            tableData.push(zRow);
-            Object.keys(byGroup).sort().forEach(sh => {
-                if(shToZone[sh] === z) {
-                    let cRow = { is_gt: 1, group: sh, isGrandTotal: false, isChild: true, zoneSafe: zSafe, latestTotalFSNs: latestDate ? byGroup[sh][latestDate].shTotal : 0 };
-                    uniqueDates.forEach(d => { cRow[d+'_atp'] = calcPct(byGroup[sh][d].atp, byGroup[sh][d].norm); cRow[d+'_sch'] = calcPct(byGroup[sh][d].sch, byGroup[sh][d].norm); cRow[d+'_po'] = calcPct(byGroup[sh][d].po, byGroup[sh][d].norm); });
-                    tableData.push(cRow);
+    Object.keys(parentTotals).sort().forEach(p => {
+        let pSafe = 'p_' + p.replace(/[^a-zA-Z0-9]/g, '');
+        let pRow = { is_gt: 1, group: p, isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe, latestTotalFSNs: latestDate ? parentTotals[p][latestDate].shTotal : 0 };
+        uniqueDates.forEach(d => { pRow[d+'_atp'] = calcPct(parentTotals[p][d].atp, parentTotals[p][d].norm); pRow[d+'_sch'] = calcPct(parentTotals[p][d].sch, parentTotals[p][d].norm); pRow[d+'_po'] = calcPct(parentTotals[p][d].po, parentTotals[p][d].norm); });
+        tableData.push(pRow);
+
+        if (hasChildren) {
+            let childrenRows = [];
+            Object.keys(childTotals).forEach(pcKey => {
+                if (pcKey.startsWith(p + '|||')) {
+                    let cObj = childTotals[pcKey];
+                    let cRow = { is_gt: 1, group: cObj.groupKey, isGrandTotal: false, isChild: true, zoneSafe: pSafe, latestTotalFSNs: latestDate ? cObj[latestDate].shTotal : 0 };
+                    uniqueDates.forEach(d => { cRow[d+'_atp'] = calcPct(cObj[d].atp, cObj[d].norm); cRow[d+'_sch'] = calcPct(cObj[d].sch, cObj[d].norm); cRow[d+'_po'] = calcPct(cObj[d].po, cObj[d].norm); });
+                    childrenRows.push(cRow);
                 }
             });
-        });
-    } else {
-        Object.values(byGroup).forEach(groupObj => {
-          let rowData = { is_gt: 1, group: groupObj.groupKey, isGrandTotal: false }, rowHasData = false;
-          rowData['latestTotalFSNs'] = latestDate ? groupObj[latestDate].shTotal : 0;
-
-          uniqueDates.forEach(d => {
-            if (groupObj[d].norm > 0) rowHasData = true;
-            rowData[d + '_atp'] = calcPct(groupObj[d].atp, groupObj[d].norm);
-            rowData[d + '_sch'] = calcPct(groupObj[d].sch, groupObj[d].norm);
-            rowData[d + '_po']  = calcPct(groupObj[d].po, groupObj[d].norm);
-          });
-          if(rowHasData) tableData.push(rowData);
-        });
-    }
+            childrenRows.sort((a,b) => b.latestTotalFSNs - a.latestTotalFSNs);
+            childrenRows.forEach(c => tableData.push(c));
+        }
+    });
 
     let columns = [
-      { title: "GT", data: 'is_gt', visible: false, searchable: false },
+      { data: 'is_gt', visible: false, searchable: false },
       { title: groupColName, data: 'group', render: renderGroupCol },
       { title: "Total FSNs (Latest SH)", data: 'latestTotalFSNs', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }
     ];
@@ -1036,11 +1094,11 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
       data: tableData, columns: columns, deferRender: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, 
       dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
       orderFixed: [0, 'asc'], order: [], 
-      paging: isShLevel ? false : true, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
+      paging: !hasChildren, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
       createdRow: function (row, data) { 
           if (data.isGrandTotal) $(row).addClass('total-row'); 
-          else if (data.isGroupHeader) { $(row).addClass('group-header'); $(row).attr('data-zone', data.zoneSafe); }
-          else if (data.isChild) { $(row).addClass('child-row child-of-' + data.zoneSafe); }
+          else if (data.isGroupHeader) { $(row).addClass('group-header collapsed'); $(row).attr('data-zone', data.zoneSafe); }
+          else if (data.isChild) { $(row).addClass('child-row child-of-' + data.zoneSafe).hide(); }
       },
       drawCallback: function(settings) {
           var api = this.api(); var $body = $(api.table().body()); var parents = $body.find('tr.group-header');
@@ -1061,127 +1119,113 @@ function exportRawCSV() {
   if (currentPage === 'p0' || currentPage === 'hub') { alert("Please select a specific Tab Level to export."); return; }
 
   if (currentPage === 'p1') {
-    const byGroup = {};
-    let zIdx = findCol(colIdxP1, ['Zone']);
-    let isShLevel = (activeTabCol === 'FC_Code');
+    const parentTotals = {};
+    let gColIdx = findCol(colIdxP1, [activeTabCol]);
+    let rIdx = findCol(colIdxP1, ['Loss_Remark']);
+    let fsnIdx = findCol(colIdxP1, ['FSN_Count']);
+    let dsiIdx = findCol(colIdxP1, ['Instock_DS_Count']);
+    let dstIdx = findCol(colIdxP1, ['Total_DS_Count']);
     let titleIdx = findCol(colIdxP1, ['Title', 'Product_Title']);
 
     activeFilteredP1.forEach(row => {
-      let groupKey = (row[colIdxP1[activeTabCol]] || 'Unknown').toString().trim();
+      let pKey = (row[colIdxP1[activeTabCol]] || 'Unknown').toString().trim();
+      if (activeTabName === 'FSN' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
       
-      let finalGroupKey = groupKey;
-      if (activeTabName === 'FSN' && titleIdx !== undefined) {
-          finalGroupKey = finalGroupKey + ' - ' + (row[titleIdx] || 'Unknown');
-      }
-
-      if (isShLevel && zIdx !== undefined) { let zName = (row[zIdx] || 'Unassigned').toString().trim(); finalGroupKey = zName + " | " + finalGroupKey; }
-      
-      const rawRemark = String(row[findCol(colIdxP1, ['Loss_Remark'])] || '').trim().toLowerCase();
+      const rawRemark = String(row[rIdx] || '').trim().toLowerCase();
       let remark = 'Other Loss';
       
-      if (rawRemark.includes('asp')) {
-          remark = 'ASP Drop';
-      } else if (rawRemark.includes('network')) {
-          remark = 'Network Issue';
-      } else {
+      if (rawRemark.includes('asp')) remark = 'ASP Drop';
+      else if (rawRemark.includes('network')) remark = 'Network Issue';
+      else {
           for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
               if (k.toLowerCase() === rawRemark) { remark = k; break; } 
           }
       }
 
-      const fsns = Number(row[findCol(colIdxP1, ['FSN_Count'])]) || 0, dsInstock = Number(row[findCol(colIdxP1, ['Instock_DS_Count'])]) || 0, dsTotal = Number(row[findCol(colIdxP1, ['Total_DS_Count'])]) || 0;
+      const fsns = Number(row[fsnIdx]) || 0;
+      let dsInstock = Number(row[dsiIdx]) || 0;
+      let dsTotal = Number(row[dstIdx]) || 0;
+      if (dsInstock > dsTotal) dsTotal = dsInstock;
+      
       const buyNode = buyNodeColP1 !== undefined ? (row[buyNodeColP1] || '').toString().trim().toLowerCase() : 'yes';
       
       let isAllowedSH = false; let isAllowedDS = false;
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; }
       else { let matches = mappedBnFilters.includes(buyNode); isAllowedSH = matches; isAllowedDS = matches; }
 
-      if (!byGroup[finalGroupKey]) { byGroup[finalGroupKey] = { total: 0, dsInstock: 0, dsTotal: 0 }; Object.keys(LOSS_REMARK_SEQ).forEach(k => byGroup[finalGroupKey][k] = 0); }
-      if (isAllowedDS) { byGroup[finalGroupKey].dsInstock += dsInstock; byGroup[finalGroupKey].dsTotal += dsTotal; }
-      if (isAllowedSH) { byGroup[finalGroupKey].total += fsns; if (byGroup[finalGroupKey][remark] !== undefined) byGroup[finalGroupKey][remark] += fsns; }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = { total: 0, dsInstock: 0, dsTotal: 0 }; Object.keys(LOSS_REMARK_SEQ).forEach(k => parentTotals[pKey][k] = 0); }
+      if (isAllowedDS) { parentTotals[pKey].dsInstock += dsInstock; parentTotals[pKey].dsTotal += dsTotal; }
+      if (isAllowedSH) { parentTotals[pKey].total += fsns; if (parentTotals[pKey][remark] !== undefined) parentTotals[pKey][remark] += fsns; }
     });
 
     const sortedRemarks = Object.keys(LOSS_REMARK_SEQ).sort((a,b) => LOSS_REMARK_SEQ[a] - LOSS_REMARK_SEQ[b]);
-    let hName = isShLevel ? "Zone | SH (FC Code)" : activeTabName;
-    let headerArr = [hName, "SH Total FSNs", "DS Instock %", "DS Instock Count", "DS Total Count"].concat(sortedRemarks);
+    let headerArr = [activeTabName, "SH Total FSNs", "DS Instock %", "DS Instock Count", "DS Total Count"].concat(sortedRemarks);
     csvDataRows.push(headerArr.map(h => `"${h}"`).join(","));
 
-    Object.keys(byGroup).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
-      let dsPct = calcPct(byGroup[group].dsInstock, byGroup[group].dsTotal).toFixed(1) + "%";
-      let rowArr = [`"${group.replace(/"/g, '""')}"`, byGroup[group].total, dsPct, byGroup[group].dsInstock, byGroup[group].dsTotal];
-      sortedRemarks.forEach(rem => rowArr.push(calcPct(byGroup[group][rem], byGroup[group].total).toFixed(1) + "%")); csvDataRows.push(rowArr.join(","));
+    Object.keys(parentTotals).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
+      let dsPct = calcPct(parentTotals[group].dsInstock, parentTotals[group].dsTotal).toFixed(1) + "%";
+      let rowArr = [`"${group.replace(/"/g, '""')}"`, parentTotals[group].total, dsPct, parentTotals[group].dsInstock, parentTotals[group].dsTotal];
+      sortedRemarks.forEach(rem => rowArr.push(calcPct(parentTotals[group][rem], parentTotals[group].total).toFixed(1) + "%")); csvDataRows.push(rowArr.join(","));
     });
   } else if (currentPage === 'p2') {
     const uniqueDates = GLOBAL_DATES;
-    const byGroup = {}; const latestDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
-    let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']); let zIdx = findCol(colIdxP2, ['Zone']); let isShLevel = (activeTabCol === 'FC_Code');
-    let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
+    const parentTotals = {}; const latestDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
+    let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']); let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
 
     activeFilteredP2.forEach(row => {
-      let groupKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[findCol(colIdxP2, ['Report_Date'])] || 'Unknown');
-      
-      let finalGroupKey = groupKey;
-      if (activeTabName === 'FSN' && titleIdx !== undefined) {
-          finalGroupKey = finalGroupKey + ' - ' + (row[titleIdx] || 'Unknown');
-      }
-
-      if (isShLevel && zIdx !== undefined) { let zName = (row[zIdx] || 'Unassigned').toString().trim(); finalGroupKey = zName + " | " + finalGroupKey; }
+      let pKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[findCol(colIdxP2, ['Report_Date'])] || 'Unknown');
+      if (activeTabName === 'FSN' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
 
       const remark = String(row[findCol(colIdxP2, ['Loss_Remark'])] || '').trim().toLowerCase(), buyNode = String(row[buyIdx] || '').trim().toLowerCase();
-      const countFSN = Number(row[findCol(colIdxP2, ['FSN_Count'])]) || 0, countTotalDS = Number(row[findCol(colIdxP2, ['Total_DS_Count'])]) || 0, countInstockDS = Number(row[findCol(colIdxP2, ['Instock_DS_Count'])]) || 0;
+      const countFSN = Number(row[findCol(colIdxP2, ['FSN_Count'])]) || 0;
+      let countTotalDS = Number(row[findCol(colIdxP2, ['Total_DS_Count'])]) || 0;
+      let countInstockDS = Number(row[findCol(colIdxP2, ['Instock_DS_Count'])]) || 0;
+      if (countInstockDS > countTotalDS) countTotalDS = countInstockDS;
       
       let isAllowedSH = false; let isAllowedDS = false;
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true'); isAllowedDS = true; }
       else { let matches = mappedBnFilters.includes(buyNode); isAllowedSH = matches; isAllowedDS = matches; }
 
-      if (!byGroup[finalGroupKey]) { byGroup[finalGroupKey] = {}; uniqueDates.forEach(d => byGroup[finalGroupKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
-      if (isAllowedSH && uniqueDates.includes(reportDate)) { byGroup[finalGroupKey][reportDate].shTotal += countFSN; if (remark === 'instock') byGroup[finalGroupKey][reportDate].shInstock += countFSN; }
-      if (isAllowedDS && uniqueDates.includes(reportDate)) { byGroup[finalGroupKey][reportDate].dsTotal += countTotalDS; byGroup[finalGroupKey][reportDate].dsInstock += countInstockDS; }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = {}; uniqueDates.forEach(d => parentTotals[pKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
+      if (isAllowedSH && uniqueDates.includes(reportDate)) { parentTotals[pKey][reportDate].shTotal += countFSN; if (remark === 'instock') parentTotals[pKey][reportDate].shInstock += countFSN; }
+      if (isAllowedDS && uniqueDates.includes(reportDate)) { parentTotals[pKey][reportDate].dsTotal += countTotalDS; parentTotals[pKey][reportDate].dsInstock += countInstockDS; }
     });
 
-    let hName = isShLevel ? "Zone | SH (FC Code)" : activeTabName;
-    let headerArr = [hName, "Latest DS Loss Count"];
+    let headerArr = [activeTabName, "Latest DS Loss Count"];
     uniqueDates.forEach(d => { headerArr.push(`SH Instock FSNs - ${d}`, `SH Total FSNs - ${d}`, `DS Instock - ${d}`, `DS Total - ${d}`); });
     csvDataRows.push(headerArr.map(h => `"${h}"`).join(","));
 
-    Object.keys(byGroup).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
-      let latestDsLoss = latestDate ? (byGroup[group][latestDate].dsTotal - byGroup[group][latestDate].dsInstock) : 0;
+    Object.keys(parentTotals).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
+      let latestDsLoss = latestDate ? (parentTotals[group][latestDate].dsTotal - parentTotals[group][latestDate].dsInstock) : 0;
       let rowArr = [`"${group.replace(/"/g, '""')}"`, latestDsLoss];
-      uniqueDates.forEach(d => { rowArr.push(byGroup[group][d].shInstock, byGroup[group][d].shTotal, byGroup[group][d].dsInstock, byGroup[group][d].dsTotal); });
+      uniqueDates.forEach(d => { rowArr.push(parentTotals[group][d].shInstock, parentTotals[group][d].shTotal, parentTotals[group][d].dsInstock, parentTotals[group][d].dsTotal); });
       csvDataRows.push(rowArr.join(","));
     });
   } else {
     const latestDate = GLOBAL_DATES.length > 0 ? GLOBAL_DATES[GLOBAL_DATES.length - 1] : null; const uniqueDates = [...GLOBAL_DATES].reverse();
-    const byGroup = {}; let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']); let zIdx = findCol(colIdxP2, ['Zone']); let isShLevel = (activeTabCol === 'FC_Code');
+    const parentTotals = {}; let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']); let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
     let idxMstnAtp = findCol(colIdxP2, ['MSTN_atp']); let idxMstnSch = findCol(colIdxP2, ['MSTN_with_scheduling']); let idxMstnPo  = findCol(colIdxP2, ['MSTN_with_po']); let idxNorm = findCol(colIdxP2, ['new_norm']); let fsnIdx = findCol(colIdxP2, ['FSN_Count']);
-    let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
 
     activeFilteredP2.forEach(row => {
-      let groupKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[findCol(colIdxP2, ['Report_Date'])] || 'Unknown');
-      
-      let finalGroupKey = groupKey;
-      if (activeTabName === 'FSN' && titleIdx !== undefined) {
-          finalGroupKey = finalGroupKey + ' - ' + (row[titleIdx] || 'Unknown');
-      }
+      let pKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[findCol(colIdxP2, ['Report_Date'])] || 'Unknown');
+      if (activeTabName === 'FSN' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
 
-      if (isShLevel && zIdx !== undefined) { let zName = (row[zIdx] || 'Unassigned').toString().trim(); finalGroupKey = zName + " | " + finalGroupKey; }
       const buyNode = String(row[buyIdx] || '').trim().toLowerCase();
       let isAllowedSH = false;
       if (bnFiltersRaw.length === 0) isAllowedSH = (buyNode === 'yes' || buyNode === 'y' || buyNode === 'true');
       else isAllowedSH = mappedBnFilters.includes(buyNode);
 
-      if (!byGroup[finalGroupKey]) { byGroup[finalGroupKey] = {}; uniqueDates.forEach(d => byGroup[finalGroupKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
-      if (isAllowedSH && uniqueDates.includes(reportDate)) { byGroup[finalGroupKey][reportDate].atp += (Number(row[idxMstnAtp]) || 0); byGroup[finalGroupKey][reportDate].sch += (Number(row[idxMstnSch]) || 0); byGroup[finalGroupKey][reportDate].po  += (Number(row[idxMstnPo]) || 0); byGroup[finalGroupKey][reportDate].norm += (Number(row[idxNorm]) || 0); byGroup[finalGroupKey][reportDate].shTotal += (Number(row[fsnIdx]) || 0); }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = {}; uniqueDates.forEach(d => parentTotals[pKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
+      if (isAllowedSH && uniqueDates.includes(reportDate)) { parentTotals[pKey][reportDate].atp += (Number(row[idxMstnAtp]) || 0); parentTotals[pKey][reportDate].sch += (Number(row[idxMstnSch]) || 0); parentTotals[pKey][reportDate].po  += (Number(row[idxMstnPo]) || 0); parentTotals[pKey][reportDate].norm += (Number(row[idxNorm]) || 0); parentTotals[pKey][reportDate].shTotal += (Number(row[fsnIdx]) || 0); }
     });
 
-    let hName = isShLevel ? "Zone | SH (FC Code)" : activeTabName;
-    let headerArr = [hName, "Total FSNs (Latest SH)"];
+    let headerArr = [activeTabName, "Total FSNs (Latest SH)"];
     uniqueDates.forEach(d => { headerArr.push(`${d} (ATP %)`, `${d} (+Sch %)`, `${d} (+PO %)`); });
     csvDataRows.push(headerArr.map(h => `"${h}"`).join(","));
 
-    Object.keys(byGroup).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
-      let latestFSN = latestDate ? byGroup[group][latestDate].shTotal : 0; let rowArr = [`"${group.replace(/"/g, '""')}"`, latestFSN];
-      uniqueDates.forEach(d => { let dNorm = byGroup[group][d].norm; rowArr.push(calcPct(byGroup[group][d].atp, dNorm).toFixed(1) + "%"); rowArr.push(calcPct(byGroup[group][d].sch, dNorm).toFixed(1) + "%"); rowArr.push(calcPct(byGroup[group][d].po, dNorm).toFixed(1) + "%"); });
+    Object.keys(parentTotals).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
+      let latestFSN = latestDate ? parentTotals[group][latestDate].shTotal : 0; let rowArr = [`"${group.replace(/"/g, '""')}"`, latestFSN];
+      uniqueDates.forEach(d => { let dNorm = parentTotals[group][d].norm; rowArr.push(calcPct(parentTotals[group][d].atp, dNorm).toFixed(1) + "%"); rowArr.push(calcPct(parentTotals[group][d].sch, dNorm).toFixed(1) + "%"); rowArr.push(calcPct(parentTotals[group][d].po, dNorm).toFixed(1) + "%"); });
       csvDataRows.push(rowArr.join(","));
     });
   }
