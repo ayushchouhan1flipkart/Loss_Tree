@@ -41,7 +41,6 @@ const findCol = (colsObj, namesArray) => {
     return undefined;
 };
 
-// PERFECT HYGIENE EXPAND/COLLAPSE HANDLER
 $(document).on('click', 'tr.group-header', function() {
     let zoneSafe = $(this).data('zone');
     let $wrapper = $(this).closest('.dataTables_wrapper');
@@ -55,7 +54,6 @@ $(document).on('click', 'tr.group-header', function() {
         $children.hide(); 
     }
     
-    // Force DataTables to recalculate heights so the sticky column NEVER misaligns
     let tableId = $wrapper.find('table.dataTable').attr('id');
     if (tableId && $.fn.DataTable.isDataTable('#' + tableId)) {
         setTimeout(() => { 
@@ -68,6 +66,8 @@ $(document).on('click', 'tr.group-header', function() {
 function renderGroupCol(d, type, row) {
     if (type !== 'display') return d;
     let content = d;
+    
+    // Only shows dropdown arrow if drill-down is enabled (isGroupHeader)
     if (row.isGroupHeader) content = `<i class="bi bi-chevron-down toggle-icon" style="cursor:pointer; margin-right:8px; color:var(--minutes-red);"></i><span style="cursor:pointer; font-weight:700;">` + d + `</span>`;
     else if (row.isChild) content = `<span style="padding-left: 20px; color: #475569;">↳ ` + d + `</span>`;
 
@@ -76,8 +76,10 @@ function renderGroupCol(d, type, row) {
 }
 
 function applyColorCoding(td, cellData, rowData) {
-  if (rowData.isGrandTotal || rowData.isGroupHeader) return; 
-  let pct = cellData; 
+  if (rowData.isGrandTotal) return; 
+  let pct = parseFloat(cellData); 
+  if (isNaN(pct)) return;
+  
   if (pct < 60) { td.style.backgroundColor = '#fee2e2'; td.style.color = '#b91c1c'; } 
   else if (pct < 80) { td.style.backgroundColor = '#fef08a'; td.style.color = '#854d0e'; } 
   else { td.style.backgroundColor = '#dcfce7'; td.style.color = '#15803d'; }
@@ -675,11 +677,12 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   } catch (err) { console.error("Summary render error", err); }
 }
 
-// 100% BULLETPROOF P1 WITH UNIVERSAL DROPDOWNS
 function buildTableP1(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
-    let hasChildren = activeTabTarget !== 'fsn';
+    
+    // BULLET-FAST TOGGLE LOGIC: If disabled, skip calculating the heavy child arrays completely.
+    let hasChildren = $('#toggle-drilldown').is(':checked') && activeTabTarget !== 'fsn';
     
     const parentTotals = {}; 
     const childTotals = {}; 
@@ -798,7 +801,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
     let columns = [ { data: 'is_gt', visible: false, searchable: false }, { title: groupColName, data: 'group', render: renderGroupCol }, { title: "SH Total FSNs", data: 'total', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }, { title: "DS Instock %", data: 'dsInstockPct', type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: applyColorCoding } ];
     const sortedRemarks = Object.keys(LOSS_REMARK_SEQ).sort((a,b) => LOSS_REMARK_SEQ[a] - LOSS_REMARK_SEQ[b]);
-    sortedRemarks.forEach(remark => { columns.push({ title: remark === 'Instock' ? 'SH Instock %' : remark, data: remark, type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: function (td, cellData, rowData) { if (remark === 'Instock') applyColorCoding(td, cellData, rowData); else if (!rowData.isGrandTotal && !rowData.isGroupHeader && cellData > 15) { td.style.color = '#b91c1c'; td.style.fontWeight = '700'; } } }); });
+    sortedRemarks.forEach(remark => { columns.push({ title: remark === 'Instock' ? 'SH Instock %' : remark, data: remark, type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: function (td, cellData, rowData) { if (remark === 'Instock') applyColorCoding(td, cellData, rowData); else if (!rowData.isGrandTotal && cellData > 15) { td.style.color = '#b91c1c'; td.style.fontWeight = '700'; } } }); });
 
     $('#' + tableId).DataTable({
       data: tableData, columns: columns, deferRender: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
@@ -823,7 +826,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 function buildTableP2(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
-    let hasChildren = activeTabTarget !== 'fsn';
+    let hasChildren = $('#toggle-drilldown').is(':checked') && activeTabTarget !== 'fsn';
     
     const uniqueDates = GLOBAL_DATES;
     const latestDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
@@ -974,7 +977,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
 function buildTableP3(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
-    let hasChildren = activeTabTarget !== 'fsn';
+    let hasChildren = $('#toggle-drilldown').is(':checked') && activeTabTarget !== 'fsn';
     
     const latestDate = GLOBAL_DATES.length > 0 ? GLOBAL_DATES[GLOBAL_DATES.length - 1] : null;
     const uniqueDates = [...GLOBAL_DATES].reverse(); 
