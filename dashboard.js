@@ -41,7 +41,6 @@ const findCol = (colsObj, namesArray) => {
     return undefined;
 };
 
-// HYGIENE EXPAND/COLLAPSE
 $(document).on('click', 'tr.group-header', function() {
     let zoneSafe = $(this).data('zone');
     let $wrapper = $(this).closest('.dataTables_wrapper');
@@ -75,13 +74,12 @@ function renderGroupCol(d, type, row) {
     return `<div style="max-width: 450px; min-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; padding-right: 5px;" title="${rawText}">${content}</div>`;
 }
 
-// BULLETPROOF CONDITIONAL FORMATTING: Overrides Bootstrap 5 table-striped shadow
 function applyColorCoding(td, cellData, rowData) {
   if (rowData.isGrandTotal) return; 
   let pct = parseFloat(cellData); 
   if (isNaN(pct)) return;
   
-  td.style.setProperty('box-shadow', 'none', 'important'); // Critical fix for Bootstrap striped tables
+  td.style.setProperty('box-shadow', 'none', 'important'); 
   
   if (pct < 60) { 
       td.style.setProperty('background-color', '#fee2e2', 'important'); 
@@ -512,7 +510,6 @@ function renderVisibleTable() {
   }, 250);
 }
 
-// 100% ERROR FREE SUMMARY TABLE RENDERING
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
@@ -690,12 +687,9 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   } catch (err) { console.error("Summary render error", err); }
 }
 
-// BULLET-FAST P1 WITH OPTIONAL DRILL-DOWN (RESTRICTED TO VENDOR/BRAND)
 function buildTableP1(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
-    
-    // Disable drilldown entirely for FSN, Vertical, and Supercategory to protect performance
     let hasChildren = $('#toggle-drilldown').is(':checked') && (activeTabTarget === 'vendor' || activeTabTarget === 'brand');
     
     const parentTotals = {}; 
@@ -821,7 +815,6 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
     
     sortedRemarks.forEach(remark => { columns.push({ title: remark === 'Instock' ? 'SH Instock %' : remark, data: remark, type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: function (td, cellData, rowData) { if (remark === 'Instock') applyColorCoding(td, cellData, rowData); else if (!rowData.isGrandTotal && cellData > 15) { td.style.color = '#b91c1c'; td.style.fontWeight = '700'; } } }); });
 
-    // UNCONDITIONAL PAGINATION: Prevents browser crash on large datasets
     $('#' + tableId).DataTable({
       data: tableData, columns: columns, deferRender: true, destroy: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
       orderFixed: [0, 'asc'], order: hasChildren ? [] : [[3, 'desc']], 
@@ -1291,7 +1284,7 @@ function populateFilterOptions() {
     let vmiCol = findCol(colIdxP1, ['VMI_Flag', 'vmi']); 
     if(vmiCol !== undefined && row[vmiCol]) sets.vmi.add(String(row[vmiCol]).trim());
     
-    let bnCol = findCol(colColIdxP1, ['Buying_Node_Flag']); 
+    let bnCol = findCol(colIdxP1, ['Buying_Node_Flag']); 
     if(bnCol !== undefined && row[bnCol]) sets.buyingNode.add(String(row[bnCol]).trim());
     
     if(idxBrandPoc1 !== undefined && row[idxBrandPoc1]) sets.brandPoc.add(String(row[idxBrandPoc1]).trim());
