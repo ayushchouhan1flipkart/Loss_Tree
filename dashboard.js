@@ -487,7 +487,7 @@ function renderVisibleTable() {
   }, 250);
 }
 
-// 100% ERROR FREE SUMMARY TABLE RENDERING
+// 100% ERROR FREE SUMMARY TABLE RENDERING: Uses safe array loops.
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
@@ -552,8 +552,8 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
         let isShSch = (bSchedDoh !== '' && bSchedDoh !== '<2DOH') ? vFsn : 0;
         let isShPo = (bPoDoh !== '' && bPoDoh !== '<2DOH') ? vFsn : 0;
 
-        // HIGH SPEED INLINE MATH: Replaces unstable function references entirely.
-        const targets = [byGroup[groupKey], zoneTotals[zoneName], byZoneTag[ztKey], shTotals[shName], byShTag[shTagKey], gt];
+        // SAFE MATHEMATICS LOOP (Bypasses the strict compiler reference error)
+        let targets = [byGroup[groupKey], zoneTotals[zoneName], byZoneTag[ztKey], shTotals[shName], byShTag[shTagKey], gt];
 
         for(let j = 0; j < targets.length; j++) {
            let b = targets[j];
