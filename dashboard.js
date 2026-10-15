@@ -818,7 +818,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
     $('#' + tableId).DataTable({
       data: tableData, columns: columns, deferRender: true, destroy: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
       orderFixed: [0, 'asc'], order: hasChildren ? [] : [[3, 'desc']], 
-      paging: true, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
+      paging: true, pageLength: 50, lengthMenu: [10, 50, 100, 250, 500, 1000, 10000, 50000], 
       createdRow: function (row, data) { 
           if (data.isGrandTotal) $(row).addClass('total-row'); 
           else if (data.isGroupHeader) { $(row).addClass('group-header collapsed'); $(row).attr('data-zone', data.zoneSafe); } 
@@ -972,7 +972,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       data: tableData, columns: columns, deferRender: true, destroy: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, 
       dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
       orderFixed: [0, 'asc'], order: [], 
-      paging: true, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
+      paging: true, pageLength: 50, lengthMenu: [10, 50, 100, 250, 500, 1000, 10000, 50000], 
       createdRow: function (row, data) { 
           if (data.isGrandTotal) $(row).addClass('total-row'); 
           else if (data.isGroupHeader) { $(row).addClass('group-header collapsed'); $(row).attr('data-zone', data.zoneSafe); }
@@ -1115,7 +1115,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
       data: tableData, columns: columns, deferRender: true, destroy: true, scrollX: true, scrollY: '55vh', scrollCollapse: true, fixedColumns: { left: 1 }, 
       dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
       orderFixed: [0, 'asc'], order: [], 
-      paging: true, pageLength: 50, lengthMenu: [10, 25, 50, 100, 250, 500, 1000], 
+      paging: true, pageLength: 50, lengthMenu: [10, 50, 100, 250, 500, 1000, 10000, 50000], 
       createdRow: function (row, data) { 
           if (data.isGrandTotal) $(row).addClass('total-row'); 
           else if (data.isGroupHeader) { $(row).addClass('group-header collapsed'); $(row).attr('data-zone', data.zoneSafe); }
