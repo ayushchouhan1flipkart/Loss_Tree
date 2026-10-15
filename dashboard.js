@@ -131,7 +131,6 @@ function applyDayChunks() {
       $('#btn-chunk-0').prop('checked', true);
       selectedChunks = [0];
   } else if (selectedChunks.length > 3) {
-      // FIX: Increased the safety limit to 3 tabs to match the new request.
       alert("To keep the dashboard super fast and prevent crashing, please select a maximum of 3 tabs at a time.");
       return; 
   }
@@ -691,8 +690,6 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
 function buildTableP1(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (groupColName === 'SH (FC Code)');
-    
-    // Disable drilldown entirely for FSN, Vertical, and Supercategory to protect performance
     let hasChildren = $('#toggle-drilldown').is(':checked') && (activeTabTarget === 'vendor' || activeTabTarget === 'brand');
     
     const parentTotals = {}; 
