@@ -600,57 +600,11 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
 
     const getSorter = (groupName) => {
       let gNorm = groupName.toLowerCase().replace(/\s+/g, '');
-      if (gNorm.includes('top100')) return 1; 
-      if (gNorm.includes('101-500')) return 2; 
-      if (gNorm.includes('core')) return 3;
-      if (gNorm.includes('next2500') || gNorm.includes('next2.5k')) return 4; 
-      if (gNorm.includes('7500') || gNorm.includes('7.5k')) return 5;
-      if (gNorm.includes('10k') || gNorm.includes('10000')) return 6; 
-      if (gNorm.includes('12.5k') || gNorm.includes('12500')) return 7;
-      if (gNorm.includes('rest')) return 8;
+      if (gNorm.includes('top100')) return 1; if (gNorm.includes('101-500')) return 2; if (gNorm.includes('core')) return 3;
+      if (gNorm.includes('next2500') || gNorm.includes('next2.5k')) return 4; if (gNorm.includes('7500') || gNorm.includes('7.5k')) return 5;
+      if (gNorm.includes('10k') || gNorm.includes('10000')) return 6; if (gNorm.includes('rest')) return 7;
       return 99;
     };
-
-    // NEW CUMULATIVE ENGINE: Accumulates metrics for Top 100 -> 101-500 -> Core -> Next2.5k -> etc.
-    const accumulateRankedBuckets = (bucketDict, isCompound) => {
-        let parentMap = {};
-        for (let key of Object.keys(bucketDict)) {
-            let parent = isCompound ? key.split("|||")[0] : "ALL";
-            let tag = isCompound ? key.split("|||")[1] : key;
-            if (!parentMap[parent]) parentMap[parent] = [];
-            parentMap[parent].push({ fullKey: key, tag: tag });
-        }
-        
-        for (let parent in parentMap) {
-            let items = parentMap[parent].sort((a,b) => getSorter(a.tag) - getSorter(b.tag));
-            let run = initBucket();
-            for (let item of items) {
-                let sortVal = getSorter(item.tag);
-                if (sortVal <= 7) { 
-                    let b = bucketDict[item.fullKey];
-                    run.fsn += b.fsn; run.atp += b.atp; run.qoh += b.qoh; run.openPo += b.openPo;
-                    run.fdrr += b.fdrr; run.sdrr += b.sdrr; run.dsInstock += b.dsInstock; run.dsTotal += b.dsTotal;
-                    run.shInstock += b.shInstock; run.shSch += b.shSch; run.shPo += b.shPo;
-                    run.mstnAtp += b.mstnAtp; run.mstnSch += b.mstnSch; run.mstnPo += b.mstnPo;
-                    run.norm += b.norm; run.iwit += b.iwit; run.irn += b.irn;
-                    run.dsMstn += b.dsMstn; run.dsMstnIt += b.dsMstnIt; run.dsNorm += b.dsNorm;
-                    run.instockItDs += b.instockItDs; run.dsNormRaw += b.dsNormRaw;
-                    
-                    b.fsn = run.fsn; b.atp = run.atp; b.qoh = run.qoh; b.openPo = run.openPo;
-                    b.fdrr = run.fdrr; b.sdrr = run.sdrr; b.dsInstock = run.dsInstock; b.dsTotal = run.dsTotal;
-                    b.shInstock = run.shInstock; b.shSch = run.shSch; b.shPo = run.shPo;
-                    b.mstnAtp = run.mstnAtp; b.mstnSch = run.mstnSch; b.mstnPo = run.mstnPo;
-                    b.norm = run.norm; b.iwit = run.iwit; b.irn = run.irn;
-                    b.dsMstn = run.dsMstn; b.dsMstnIt = run.dsMstnIt; b.dsNorm = run.dsNorm;
-                    b.instockItDs = run.instockItDs; b.dsNormRaw = run.dsNormRaw;
-                }
-            }
-        }
-    };
-
-    accumulateRankedBuckets(byGroup, false);
-    accumulateRankedBuckets(byZoneTag, true);
-    accumulateRankedBuckets(byShTag, true);
 
     const formatRow = (r, sOrd, grp, isGT, isGrpHdr, isCh, zSafe) => ({
         is_gt: isGT ? 0 : 1, sort_order: sOrd, group: grp, isGrandTotal: isGT, isGroupHeader: isGrpHdr, isChild: isCh, zoneSafe: zSafe,
@@ -743,11 +697,12 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
 
 function buildTableP1(tableId, data, groupCol, groupColName) {
   try {
-    let isShLevel = (groupColName === 'SH (FC Code)');
-    
-    // RESTORED ZONE x SH: Always enable drill-down if on SH tab, else follow toggle logic
+    let isShLevel = (activeTabTarget === 'sh');
     let hasChildren = isShLevel || ($('#toggle-drilldown').is(':checked') && (activeTabTarget === 'vendor' || activeTabTarget === 'brand'));
     
+    // FIX: Update header so it makes sense when grouping by Zone
+    if (isShLevel) groupColName = 'Zone';
+
     const parentTotals = {}; 
     const childTotals = {}; 
     let grandTotalFsns = 0, grandTotalDSInstock = 0, grandTotalDSTotal = 0; 
@@ -781,6 +736,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
       if (hasChildren) {
           if (isShLevel) {
               pKey = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
+              if (!pKey || pKey === '-' || pKey === '') pKey = 'Unassigned';
               cKey = baseGroupKey;
           } else {
               cKey = shIdx !== undefined ? (row[shIdx] || 'Unknown').toString().trim() : 'Unknown';
@@ -893,8 +849,10 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
 function buildTableP2(tableId, data, groupCol, groupColName) {
   try {
-    let isShLevel = (groupColName === 'SH (FC Code)');
+    let isShLevel = (activeTabTarget === 'sh');
     let hasChildren = isShLevel || ($('#toggle-drilldown').is(':checked') && (activeTabTarget === 'vendor' || activeTabTarget === 'brand'));
+    
+    if (isShLevel) groupColName = 'Zone';
     
     const uniqueDates = GLOBAL_DATES;
     const latestDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
@@ -924,6 +882,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       if (hasChildren) {
           if (isShLevel) {
               pKey = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
+              if (!pKey || pKey === '-' || pKey === '') pKey = 'Unassigned';
               cKey = baseGroupKey;
           } else {
               cKey = shIdx !== undefined ? (row[shIdx] || 'Unknown').toString().trim() : 'Unknown';
@@ -1047,8 +1006,10 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
 
 function buildTableP3(tableId, data, groupCol, groupColName) {
   try {
-    let isShLevel = (groupColName === 'SH (FC Code)');
+    let isShLevel = (activeTabTarget === 'sh');
     let hasChildren = isShLevel || ($('#toggle-drilldown').is(':checked') && (activeTabTarget === 'vendor' || activeTabTarget === 'brand'));
+    
+    if (isShLevel) groupColName = 'Zone';
     
     const latestDate = GLOBAL_DATES.length > 0 ? GLOBAL_DATES[GLOBAL_DATES.length - 1] : null;
     const uniqueDates = [...GLOBAL_DATES].reverse(); 
@@ -1084,6 +1045,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
       if (hasChildren) {
           if (isShLevel) {
               pKey = zIdx !== undefined ? (row[zIdx] || 'Unassigned').toString().trim() : 'Unassigned';
+              if (!pKey || pKey === '-' || pKey === '') pKey = 'Unassigned';
               cKey = baseGroupKey;
           } else {
               cKey = shIdx !== undefined ? (row[shIdx] || 'Unknown').toString().trim() : 'Unknown';
