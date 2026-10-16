@@ -5,6 +5,9 @@ let GLOBAL_DATES = [];
 let masterHubData = [];
 let currentCohortPill = 'All';
 
+// NEW: This lock ensures filters never duplicate and never reset when clicking "Load"
+let isFiltersPopulated = false; 
+
 let currentPage = 'p1';
 let activeTabCol = 'Vendor_Name';
 let activeTabName = 'Vendor Name';
@@ -248,7 +251,14 @@ function initDashboardFromClient(d1, d2) {
             return a.localeCompare(b);
         });
     }
-    populateFilterOptions(); triggerFilterLogic(); 
+    
+    // FIX: Only build filters once. Stops duplicates and saves user filter selections!
+    if (!isFiltersPopulated) {
+        populateFilterOptions();
+        isFiltersPopulated = true;
+    }
+    
+    triggerFilterLogic(); 
   } catch(e) { console.error("Init Error:", e); }
 }
 
@@ -862,7 +872,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       let reportDate = String(row[rDateIdx] || 'Unknown');
       
       let pKey = baseGroupKey;
-      if (activeTabTarget === 'fsn' && titleIdx !== undefined pKey += ' - ' + (row[titleIdx] || 'Unknown');
+      if (activeTabTarget === 'fsn' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
       
       let cKey = null;
       if (hasChildren) {
