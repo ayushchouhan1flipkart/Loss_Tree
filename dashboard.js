@@ -862,7 +862,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       let reportDate = String(row[rDateIdx] || 'Unknown');
       
       let pKey = baseGroupKey;
-      if (activeTabTarget === 'fsn' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
+      if (activeTabTarget === 'fsn' && titleIdx !== undefined pKey += ' - ' + (row[titleIdx] || 'Unknown');
       
       let cKey = null;
       if (hasChildren) {
@@ -1302,7 +1302,14 @@ function populateFilterOptions() {
     let fsnCol = findCol(colIdxP1, ['FSN', 'fsn']); 
     if(fsnCol !== undefined && row[fsnCol]) sets.fsn.add(String(row[fsnCol]).trim());
   });
-  const fillSelect = (id, set) => { const el = $(id); Array.from(set).sort().forEach(val => el.append(new Option(val, val))); };
+  
+  // FIX: Wipes out the old duplicate filters before adding the new ones
+  const fillSelect = (id, set) => { 
+      const el = $(id); 
+      el.empty(); 
+      Array.from(set).sort().forEach(val => el.append(new Option(val, val))); 
+  };
+  
   fillSelect('#filter-bu', sets.bu); fillSelect('#filter-company', sets.company); fillSelect('#filter-kam', sets.kam); fillSelect('#filter-kam-lead', sets.kamLead); fillSelect('#filter-owner', sets.owner);
   fillSelect('#filter-sh', sets.sh); fillSelect('#filter-brand', sets.brand); fillSelect('#filter-vendor', sets.vendor); fillSelect('#filter-vertical', sets.vertical); fillSelect('#filter-tagging', sets.tagging); fillSelect('#filter-vmi', sets.vmi); fillSelect('#filter-supercategory', sets.supercategory);
   fillSelect('#filter-buying-node', sets.buyingNode); fillSelect('#filter-brand-poc', sets.brandPoc); fillSelect('#filter-fsn', sets.fsn); fillSelect('#filter-ds-bucket', sets.dsBucket); fillSelect('#filter-zone', sets.zone); fillSelect('#filter-updated-bu', sets.updatedBu); fillSelect('#filter-gourmet', sets.gourmet); fillSelect('#filter-regional', sets.regional);
