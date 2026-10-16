@@ -6,7 +6,7 @@ let masterHubData = [];
 let currentCohortPill = 'All';
 
 let isFiltersPopulated = false; 
-let shZoneMap = {}; // Memorizes SH -> Zone mapping
+let shZoneMap = {}; 
 
 let currentPage = 'p1';
 let activeTabCol = 'Vendor_Name';
@@ -228,7 +228,6 @@ function initDashboardFromClient(d1, d2) {
     
     rawDataP1 = d1;
 
-    // Generate Global SH -> Zone Memory Bridge
     let shCol1 = findCol(colIdxP1, ['FC_Code']);
     let zCol1 = findCol(colIdxP1, ['Zone']);
     if (shCol1 !== undefined && zCol1 !== undefined) {
@@ -401,23 +400,15 @@ function triggerFilterLogic() {
 }
 
 function aggregateAllDataInMemory() {
-  const getSet = (id) => new Set(($(id).val() || []).map(v => String(v).trim().toUpperCase()));
-  
   const filterSets = {
-    bu: getSet('#filter-bu'), company: getSet('#filter-company'), kam: getSet('#filter-kam'),
-    kamLead: getSet('#filter-kam-lead'), owner: getSet('#filter-owner'), sh: getSet('#filter-sh'),
-    brand: getSet('#filter-brand'), vendor: getSet('#filter-vendor'), vertical: getSet('#filter-vertical'),
-    supercategory: getSet('#filter-supercategory'), tagging: getSet('#filter-tagging'), vmi: getSet('#filter-vmi'), 
-    brandPoc: getSet('#filter-brand-poc'), fsn: getSet('#filter-fsn'), dsBucket: getSet('#filter-ds-bucket'), 
-    zone: getSet('#filter-zone'), updatedBu: getSet('#filter-updated-bu'), gourmet: getSet('#filter-gourmet'), 
-    regional: getSet('#filter-regional'), organic: getSet('#filter-organic'), em: getSet('#filter-em'), 
-    ubpl: getSet('#filter-ubpl'), buyingNode: getSet('#filter-buying-node')
-  };
-
-  const check = (idx, setObj, row) => {
-    if (setObj.size === 0 || idx === undefined) return true;
-    let v = String(row[idx] || '').trim().toUpperCase();
-    return setObj.has(v);
+    bu: new Set($('#filter-bu').val() || []), company: new Set($('#filter-company').val() || []), kam: new Set($('#filter-kam').val() || []),
+    kamLead: new Set($('#filter-kam-lead').val() || []), owner: new Set($('#filter-owner').val() || []), sh: new Set($('#filter-sh').val() || []),
+    brand: new Set($('#filter-brand').val() || []), vendor: new Set($('#filter-vendor').val() || []), vertical: new Set($('#filter-vertical').val() || []),
+    supercategory: new Set($('#filter-supercategory').val() || []),
+    tagging: new Set($('#filter-tagging').val() || []), vmi: new Set($('#filter-vmi').val() || []), brandPoc: new Set($('#filter-brand-poc').val() || []),
+    fsn: new Set($('#filter-fsn').val() || []), dsBucket: new Set($('#filter-ds-bucket').val() || []), zone: new Set($('#filter-zone').val() || []),
+    updatedBu: new Set($('#filter-updated-bu').val() || []), gourmet: new Set($('#filter-gourmet').val() || []), regional: new Set($('#filter-regional').val() || []),
+    organic: new Set($('#filter-organic').val() || []), em: new Set($('#filter-em').val() || []), ubpl: new Set($('#filter-ubpl').val() || [])
   };
 
   let idxBU1 = findCol(colIdxP1, ['BU']); let idxComp1 = findCol(colIdxP1, ['Company']); let idxKam1 = findCol(colIdxP1, ['KAM']); let idxLead1 = findCol(colIdxP1, ['KAM_Lead']); let idxOwner1 = findCol(colIdxP1, ['Instock_Owner']);
@@ -428,20 +419,32 @@ function aggregateAllDataInMemory() {
   let idxSuper1 = findCol(colIdxP1, ['Super_Category', 'supercategory']); let idxOrg1 = findCol(colIdxP1, ['Organic_Flag', 'organic']); let idxEm1 = findCol(colIdxP1, ['Engagement_Manager', 'engagementmanager']); let idxUbpl1 = findCol(colIdxP1, ['UB_PL_Flag', 'ubpl', 'ub_pl']);
 
   activeFilteredP1 = rawDataP1.filter(row => {
-    let buyNode = idxBuyNode1 !== undefined ? String(row[idxBuyNode1] || '').trim().toUpperCase() : 'YES';
-    if (filterSets.buyingNode.size > 0 && !filterSets.buyingNode.has(buyNode)) return false;
-
-    if (!check(idxBU1, filterSets.bu, row)) return false; if (!check(idxComp1, filterSets.company, row)) return false;
-    if (!check(idxKam1, filterSets.kam, row)) return false; if (!check(idxLead1, filterSets.kamLead, row)) return false;
-    if (!check(idxOwner1, filterSets.owner, row)) return false; if (!check(idxSH1, filterSets.sh, row)) return false;
-    if (!check(idxBrand1, filterSets.brand, row)) return false; if (!check(idxVendor1, filterSets.vendor, row)) return false;
-    if (!check(idxVert1, filterSets.vertical, row)) return false; if (!check(idxSuper1, filterSets.supercategory, row)) return false;
-    if (!check(idxTag1, filterSets.tagging, row)) return false; if (!check(idxVmi1, filterSets.vmi, row)) return false;
-    if (!check(idxBrandPoc1, filterSets.brandPoc, row)) return false; if (!check(idxFsn1, filterSets.fsn, row)) return false;
-    if (!check(idxDsBucket1, filterSets.dsBucket, row)) return false; if (!check(idxZone1, filterSets.zone, row)) return false;
-    if (!check(idxUpdatedBu1, filterSets.updatedBu, row)) return false; if (!check(idxGourmet1, filterSets.gourmet, row)) return false;
-    if (!check(idxRegional1, filterSets.regional, row)) return false; if (!check(idxOrg1, filterSets.organic, row)) return false;
-    if (!check(idxEm1, filterSets.em, row)) return false; if (!check(idxUbpl1, filterSets.ubpl, row)) return false;
+    let buyNode = idxBuyNode1 !== undefined ? String(row[idxBuyNode1] || '').trim().toLowerCase() : 'yes';
+    let mappedBnFilters = ($('#filter-buying-node').val() || []).map(v => String(v).toLowerCase().trim());
+    if (mappedBnFilters.length > 0 && !mappedBnFilters.includes(buyNode)) return false;
+    if (filterSets.dsBucket.size > 0 && idxDsBucket1 !== undefined && !filterSets.dsBucket.has(String(row[idxDsBucket1]).trim())) return false;
+    if (filterSets.zone.size > 0 && idxZone1 !== undefined && !filterSets.zone.has(String(row[idxZone1]).trim())) return false;
+    if (filterSets.updatedBu.size > 0 && idxUpdatedBu1 !== undefined && !filterSets.updatedBu.has(String(row[idxUpdatedBu1]).trim())) return false;
+    if (filterSets.gourmet.size > 0 && idxGourmet1 !== undefined && !filterSets.gourmet.has(String(row[idxGourmet1]).trim())) return false;
+    if (filterSets.regional.size > 0 && idxRegional1 !== undefined && !filterSets.regional.has(String(row[idxRegional1]).trim())) return false;
+    if (filterSets.organic.size > 0 && idxOrg1 !== undefined && !filterSets.organic.has(String(row[idxOrg1]).trim())) return false;
+    if (filterSets.em.size > 0 && idxEm1 !== undefined && !filterSets.em.has(String(row[idxEm1]).trim())) return false;
+    if (filterSets.ubpl.size > 0 && idxUbpl1 !== undefined && !filterSets.ubpl.has(String(row[idxUbpl1]).trim())) return false;
+    
+    if (filterSets.bu.size > 0 && idxBU1 !== undefined && !filterSets.bu.has(String(row[idxBU1]).trim())) return false;
+    if (filterSets.company.size > 0 && idxComp1 !== undefined && !filterSets.company.has(String(row[idxComp1]).trim())) return false;
+    if (filterSets.kam.size > 0 && idxKam1 !== undefined && !filterSets.kam.has(String(row[idxKam1]).trim())) return false;
+    if (filterSets.kamLead.size > 0 && idxLead1 !== undefined && !filterSets.kamLead.has(String(row[idxLead1]).trim())) return false;
+    if (filterSets.owner.size > 0 && idxOwner1 !== undefined && !filterSets.owner.has(String(row[idxOwner1]).trim())) return false;
+    if (filterSets.sh.size > 0 && idxSH1 !== undefined && !filterSets.sh.has(String(row[idxSH1]).trim())) return false;
+    if (filterSets.brand.size > 0 && idxBrand1 !== undefined && !filterSets.brand.has(String(row[idxBrand1]).trim())) return false;
+    if (filterSets.vendor.size > 0 && idxVendor1 !== undefined && !filterSets.vendor.has(String(row[idxVendor1]).trim())) return false;
+    if (filterSets.vertical.size > 0 && idxVert1 !== undefined && !filterSets.vertical.has(String(row[idxVert1]).trim())) return false;
+    if (filterSets.supercategory.size > 0 && idxSuper1 !== undefined && !filterSets.supercategory.has(String(row[idxSuper1]).trim())) return false;
+    if (filterSets.tagging.size > 0 && idxTag1 !== undefined && !filterSets.tagging.has(String(row[idxTag1]).trim())) return false;
+    if (filterSets.vmi.size > 0 && idxVmi1 !== undefined && !filterSets.vmi.has(String(row[idxVmi1]).trim())) return false;
+    if (filterSets.brandPoc.size > 0 && idxBrandPoc1 !== undefined && !filterSets.brandPoc.has(String(row[idxBrandPoc1]).trim())) return false;
+    if (filterSets.fsn.size > 0 && idxFsn1 !== undefined && !filterSets.fsn.has(String(row[idxFsn1]).trim())) return false;
     return true;
   });
 
@@ -453,20 +456,32 @@ function aggregateAllDataInMemory() {
   let idxSuper2 = findCol(colIdxP2, ['Super_Category', 'supercategory']), idxOrg2 = findCol(colIdxP2, ['Organic_Flag', 'organic']), idxEm2 = findCol(colIdxP2, ['Engagement_Manager', 'engagementmanager']), idxUbpl2 = findCol(colIdxP2, ['UB_PL_Flag', 'ubpl', 'ub_pl']);
 
   activeFilteredP2 = rawDataP2.filter(row => {
-    let buyNode = idxBuyNode2 !== undefined ? String(row[idxBuyNode2] || '').trim().toUpperCase() : 'YES';
-    if (filterSets.buyingNode.size > 0 && !filterSets.buyingNode.has(buyNode)) return false;
+    let buyNode = idxBuyNode2 !== undefined ? String(row[idxBuyNode2] || '').trim().toLowerCase() : 'yes';
+    let mappedBnFilters = ($('#filter-buying-node').val() || []).map(v => String(v).toLowerCase().trim());
+    if (mappedBnFilters.length > 0 && !mappedBnFilters.includes(buyNode)) return false;
+    if (filterSets.dsBucket.size > 0 && idxDsBucket2 !== undefined && !filterSets.dsBucket.has(String(row[idxDsBucket2]).trim())) return false;
+    if (filterSets.zone.size > 0 && idxZone2 !== undefined && !filterSets.zone.has(String(row[idxZone2]).trim())) return false;
+    if (filterSets.updatedBu.size > 0 && idxUpdatedBu2 !== undefined && !filterSets.updatedBu.has(String(row[idxUpdatedBu2]).trim())) return false;
+    if (filterSets.gourmet.size > 0 && idxGourmet2 !== undefined && !filterSets.gourmet.has(String(row[idxGourmet2]).trim())) return false;
+    if (filterSets.regional.size > 0 && idxRegional2 !== undefined && !filterSets.regional.has(String(row[idxRegional2]).trim())) return false;
+    if (filterSets.organic.size > 0 && idxOrg2 !== undefined && !filterSets.organic.has(String(row[idxOrg2]).trim())) return false;
+    if (filterSets.em.size > 0 && idxEm2 !== undefined && !filterSets.em.has(String(row[idxEm2]).trim())) return false;
+    if (filterSets.ubpl.size > 0 && idxUbpl2 !== undefined && !filterSets.ubpl.has(String(row[idxUbpl2]).trim())) return false;
 
-    if (!check(idxBU2, filterSets.bu, row)) return false; if (!check(idxComp2, filterSets.company, row)) return false;
-    if (!check(idxKam2, filterSets.kam, row)) return false; if (!check(idxLead2, filterSets.kamLead, row)) return false;
-    if (!check(idxOwner2, filterSets.owner, row)) return false; if (!check(idxSH2, filterSets.sh, row)) return false;
-    if (!check(idxBrand2, filterSets.brand, row)) return false; if (!check(idxVendor2, filterSets.vendor, row)) return false;
-    if (!check(idxVert2, filterSets.vertical, row)) return false; if (!check(idxSuper2, filterSets.supercategory, row)) return false;
-    if (!check(idxTag2, filterSets.tagging, row)) return false; if (!check(idxVmi2, filterSets.vmi, row)) return false;
-    if (!check(idxBrandPoc2, filterSets.brandPoc, row)) return false; if (!check(idxFsn2, filterSets.fsn, row)) return false;
-    if (!check(idxDsBucket2, filterSets.dsBucket, row)) return false; if (!check(idxZone2, filterSets.zone, row)) return false;
-    if (!check(idxUpdatedBu2, filterSets.updatedBu, row)) return false; if (!check(idxGourmet2, filterSets.gourmet, row)) return false;
-    if (!check(idxRegional2, filterSets.regional, row)) return false; if (!check(idxOrg2, filterSets.organic, row)) return false;
-    if (!check(idxEm2, filterSets.em, row)) return false; if (!check(idxUbpl2, filterSets.ubpl, row)) return false;
+    if (filterSets.bu.size > 0 && idxBU2 !== undefined && !filterSets.bu.has(String(row[idxBU2]).trim())) return false;
+    if (filterSets.company.size > 0 && idxComp2 !== undefined && !filterSets.company.has(String(row[idxComp2]).trim())) return false;
+    if (filterSets.kam.size > 0 && idxKam2 !== undefined && !filterSets.kam.has(String(row[idxKam2]).trim())) return false;
+    if (filterSets.kamLead.size > 0 && idxLead2 !== undefined && !filterSets.kamLead.has(String(row[idxLead2]).trim())) return false;
+    if (filterSets.owner.size > 0 && idxOwner2 !== undefined && !filterSets.owner.has(String(row[idxOwner2]).trim())) return false;
+    if (filterSets.sh.size > 0 && idxSH2 !== undefined && !filterSets.sh.has(String(row[idxSH2]).trim())) return false;
+    if (filterSets.brand.size > 0 && idxBrand2 !== undefined && !filterSets.brand.has(String(row[idxBrand2]).trim())) return false;
+    if (filterSets.vendor.size > 0 && idxVendor2 !== undefined && !filterSets.vendor.has(String(row[idxVendor2]).trim())) return false;
+    if (filterSets.vertical.size > 0 && idxVert2 !== undefined && !filterSets.vertical.has(String(row[idxVert2]).trim())) return false;
+    if (filterSets.supercategory.size > 0 && idxSuper2 !== undefined && !filterSets.supercategory.has(String(row[idxSuper2]).trim())) return false;
+    if (filterSets.tagging.size > 0 && idxTag2 !== undefined && !filterSets.tagging.has(String(row[idxTag2]).trim())) return false;
+    if (filterSets.vmi.size > 0 && idxVmi2 !== undefined && !filterSets.vmi.has(String(row[idxVmi2]).trim())) return false;
+    if (filterSets.brandPoc.size > 0 && idxBrandPoc2 !== undefined && !filterSets.brandPoc.has(String(row[idxBrandPoc2]).trim())) return false;
+    if (filterSets.fsn.size > 0 && idxFsn2 !== undefined && !filterSets.fsn.has(String(row[idxFsn2]).trim())) return false;
     return true;
   });
 }
@@ -598,49 +613,9 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       let gNorm = groupName.toLowerCase().replace(/\s+/g, '');
       if (gNorm.includes('top100')) return 1; if (gNorm.includes('101-500')) return 2; if (gNorm.includes('core')) return 3;
       if (gNorm.includes('next2500') || gNorm.includes('next2.5k')) return 4; if (gNorm.includes('7500') || gNorm.includes('7.5k')) return 5;
-      if (gNorm.includes('10k') || gNorm.includes('10000')) return 6; if (gNorm.includes('12.5k') || gNorm.includes('12500')) return 7; if (gNorm.includes('rest')) return 8;
+      if (gNorm.includes('10k') || gNorm.includes('10000')) return 6; if (gNorm.includes('rest')) return 7;
       return 99;
     };
-
-    // --- CUMULATIVE LOGIC CORE ---
-    const accumulateRankedBuckets = (bucketDict, isCompound) => {
-        let parentMap = {};
-        for (let key of Object.keys(bucketDict)) {
-            let parent = isCompound ? key.split("|||")[0] : "ALL";
-            let tag = isCompound ? key.split("|||")[1] : key;
-            if (!parentMap[parent]) parentMap[parent] = [];
-            parentMap[parent].push({ fullKey: key, tag: tag });
-        }
-        for (let parent in parentMap) {
-            let items = parentMap[parent].sort((a,b) => getSorter(a.tag) - getSorter(b.tag));
-            let run = initBucket();
-            for (let item of items) {
-                let sortVal = getSorter(item.tag);
-                if (sortVal <= 7) { 
-                    let b = bucketDict[item.fullKey];
-                    run.fsn += b.fsn; run.atp += b.atp; run.qoh += b.qoh; run.openPo += b.openPo;
-                    run.fdrr += b.fdrr; run.sdrr += b.sdrr; run.dsInstock += b.dsInstock; run.dsTotal += b.dsTotal;
-                    run.shInstock += b.shInstock; run.shSch += b.shSch; run.shPo += b.shPo;
-                    run.mstnAtp += b.mstnAtp; run.mstnSch += b.mstnSch; run.mstnPo += b.mstnPo;
-                    run.norm += b.norm; run.iwit += b.iwit; run.irn += b.irn;
-                    run.dsMstn += b.dsMstn; run.dsMstnIt += b.dsMstnIt; run.dsNorm += b.dsNorm;
-                    run.instockItDs += b.instockItDs; run.dsNormRaw += b.dsNormRaw;
-                    
-                    b.fsn = run.fsn; b.atp = run.atp; b.qoh = run.qoh; b.openPo = run.openPo;
-                    b.fdrr = run.fdrr; b.sdrr = run.sdrr; b.dsInstock = run.dsInstock; b.dsTotal = run.dsTotal;
-                    b.shInstock = run.shInstock; b.shSch = run.shSch; b.shPo = run.shPo;
-                    b.mstnAtp = run.mstnAtp; b.mstnSch = run.mstnSch; b.mstnPo = run.mstnPo;
-                    b.norm = run.norm; b.iwit = run.iwit; b.irn = run.irn;
-                    b.dsMstn = run.dsMstn; b.dsMstnIt = run.dsMstnIt; b.dsNorm = run.dsNorm;
-                    b.instockItDs = run.instockItDs; b.dsNormRaw = run.dsNormRaw;
-                }
-            }
-        }
-    };
-
-    accumulateRankedBuckets(byGroup, false);
-    accumulateRankedBuckets(byZoneTag, true);
-    accumulateRankedBuckets(byShTag, true);
 
     const formatRow = (r, sOrd, grp, isGT, isGrpHdr, isCh, zSafe) => ({
         is_gt: isGT ? 0 : 1, sort_order: sOrd, group: grp, isGrandTotal: isGT, isGroupHeader: isGrpHdr, isChild: isCh, zoneSafe: zSafe,
@@ -735,10 +710,8 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (activeTabTarget === 'sh');
     let hasChildren = isShLevel || ($('#toggle-drilldown').is(':checked') && (activeTabTarget === 'vendor' || activeTabTarget === 'brand'));
-    
-    // Hardcode UI Override: if SH tab, parent header is Zone
     if (isShLevel) groupColName = 'Zone';
-    
+
     const parentTotals = {}; 
     const childTotals = {}; 
     let grandTotalFsns = 0, grandTotalDSInstock = 0, grandTotalDSTotal = 0; 
@@ -750,6 +723,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
     let dsiIdx = findCol(colIdxP1, ['Instock_DS_Count']);
     let dstIdx = findCol(colIdxP1, ['Total_DS_Count']);
     let bnIdx = findCol(colIdxP1, ['Buying_Node_Flag']);
+    let zIdx = findCol(colIdxP1, ['Zone']);
     let shIdx = findCol(colIdxP1, ['FC_Code']);
     let titleIdx = findCol(colIdxP1, ['Title', 'Product_Title']);
 
@@ -760,20 +734,39 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
     
     for (let i = 0; i < data.length; i++) {
       let row = data[i];
-      let baseGroupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let rawBaseKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let upperBaseKey = rawBaseKey.toUpperCase();
       
-      let pKey = baseGroupKey;
+      let pKeyRaw = rawBaseKey;
+      let pKey = upperBaseKey;
+      
       if (activeTabTarget === 'fsn' && titleIdx !== undefined) {
-          pKey += ' - ' + (row[titleIdx] || 'Unknown');
+          let title = String(row[titleIdx] || 'Unknown').trim();
+          pKeyRaw += ' - ' + title;
+          pKey += ' - ' + title.toUpperCase();
       }
 
+      let cKeyRaw = null;
       let cKey = null;
+      
       if (hasChildren) {
           if (isShLevel) {
-              pKey = shZoneMap[baseGroupKey.toUpperCase()] || 'Unassigned';
-              cKey = baseGroupKey;
+              let rawZone = 'Unassigned';
+              if (zIdx !== undefined && row[zIdx]) {
+                  rawZone = String(row[zIdx]).trim();
+              } else if (shZoneMap[upperBaseKey]) {
+                  rawZone = shZoneMap[upperBaseKey];
+              }
+              if (!rawZone || rawZone === '-') rawZone = 'Unassigned';
+              
+              pKeyRaw = rawZone.charAt(0).toUpperCase() + rawZone.slice(1).toLowerCase();
+              pKey = pKeyRaw.toUpperCase();
+              
+              cKeyRaw = rawBaseKey;
+              cKey = upperBaseKey;
           } else {
-              cKey = shIdx !== undefined && row[shIdx] ? String(row[shIdx]).trim() : 'Unknown';
+              cKeyRaw = shIdx !== undefined && row[shIdx] ? String(row[shIdx]).trim() : 'Unknown';
+              cKey = cKeyRaw.toUpperCase();
           }
       }
 
@@ -798,12 +791,12 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'YES' || buyNode === 'Y' || buyNode === 'TRUE'); isAllowedDS = true; } 
       else { let matchesFilter = mappedBnFilters.includes(buyNode); isAllowedSH = matchesFilter; isAllowedDS = matchesFilter; }
 
-      if (!parentTotals[pKey]) { parentTotals[pKey] = { groupKey: pKey, totalFsns: 0, dsInstock: 0, dsTotal: 0, remarks: {} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => parentTotals[pKey].remarks[k] = 0); }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = { groupKey: pKeyRaw, totalFsns: 0, dsInstock: 0, dsTotal: 0, remarks: {} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => parentTotals[pKey].remarks[k] = 0); }
       
       let pcKey = null;
       if (hasChildren && cKey) {
           pcKey = pKey + '|||' + cKey;
-          if (!childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey, totalFsns: 0, dsInstock: 0, dsTotal: 0, remarks: {} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => childTotals[pcKey].remarks[k] = 0); }
+          if (!childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKeyRaw, totalFsns: 0, dsInstock: 0, dsTotal: 0, remarks: {} }; Object.keys(LOSS_REMARK_SEQ).forEach(k => childTotals[pcKey].remarks[k] = 0); }
       }
 
       if (isAllowedDS) { 
@@ -836,9 +829,10 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
     }
 
     Object.keys(parentTotals).sort().forEach(p => {
+        let pObj = parentTotals[p];
         let pSafe = 'p_' + p.replace(/[^a-zA-Z0-9]/g, '');
-        let pRow = { is_gt: 1, group: p, total: parentTotals[p].totalFsns, dsInstockPct: calcPct(parentTotals[p].dsInstock, parentTotals[p].dsTotal), isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe };
-        Object.keys(LOSS_REMARK_SEQ).forEach(rem => pRow[rem] = calcPct(parentTotals[p].remarks[rem], parentTotals[p].totalFsns)); 
+        let pRow = { is_gt: 1, group: pObj.groupKey, total: pObj.totalFsns, dsInstockPct: calcPct(pObj.dsInstock, pObj.dsTotal), isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe };
+        Object.keys(LOSS_REMARK_SEQ).forEach(rem => pRow[rem] = calcPct(pObj.remarks[rem], pObj.totalFsns)); 
         tableData.push(pRow);
 
         if (hasChildren) {
@@ -885,8 +879,6 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (activeTabTarget === 'sh');
     let hasChildren = isShLevel || ($('#toggle-drilldown').is(':checked') && (activeTabTarget === 'vendor' || activeTabTarget === 'brand'));
-    
-    // Hardcode UI Override
     if (isShLevel) groupColName = 'Zone';
     
     const uniqueDates = GLOBAL_DATES;
@@ -906,19 +898,32 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
 
     for (let i = 0; i < data.length; i++) {
       let row = data[i];
-      let baseGroupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let rawBaseKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let upperBaseKey = rawBaseKey.toUpperCase();
       let reportDate = String(row[rDateIdx] || 'Unknown');
       
-      let pKey = baseGroupKey;
-      if (activeTabTarget === 'fsn' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
+      let pKeyRaw = rawBaseKey;
+      let pKey = upperBaseKey;
       
+      if (activeTabTarget === 'fsn' && titleIdx !== undefined) {
+          let title = String(row[titleIdx] || 'Unknown').trim();
+          pKeyRaw += ' - ' + title;
+          pKey += ' - ' + title.toUpperCase();
+      }
+
+      let cKeyRaw = null;
       let cKey = null;
+      
       if (hasChildren) {
           if (isShLevel) {
-              pKey = shZoneMap[baseGroupKey.toUpperCase()] || 'Unassigned';
-              cKey = baseGroupKey;
+              let rawZone = shZoneMap[upperBaseKey] || 'Unassigned';
+              pKeyRaw = rawZone.charAt(0).toUpperCase() + rawZone.slice(1).toLowerCase();
+              pKey = pKeyRaw.toUpperCase();
+              cKeyRaw = rawBaseKey;
+              cKey = upperBaseKey;
           } else {
-              cKey = shIdx !== undefined && row[shIdx] ? String(row[shIdx]).trim() : 'Unknown';
+              cKeyRaw = shIdx !== undefined && row[shIdx] ? String(row[shIdx]).trim() : 'Unknown';
+              cKey = cKeyRaw.toUpperCase();
           }
       }
 
@@ -933,12 +938,12 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'YES' || buyNode === 'Y' || buyNode === 'TRUE'); isAllowedDS = true; } 
       else { let matchesFilter = mappedBnFilters.includes(buyNode); isAllowedSH = matchesFilter; isAllowedDS = matchesFilter; }
 
-      if (!parentTotals[pKey]) { parentTotals[pKey] = {}; uniqueDates.forEach(d => parentTotals[pKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = { groupKey: pKeyRaw }; uniqueDates.forEach(d => parentTotals[pKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
       
       let pcKey = null;
       if (hasChildren && cKey) {
           pcKey = pKey + '|||' + cKey;
-          if (!childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey }; uniqueDates.forEach(d => childTotals[pcKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
+          if (!childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKeyRaw }; uniqueDates.forEach(d => childTotals[pcKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
       }
       
       if (isAllowedSH && uniqueDates.includes(reportDate)) {
@@ -978,9 +983,10 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     if(gtHasData) tableData.push(gtRow);
 
     Object.keys(parentTotals).sort().forEach(p => {
+        let pObj = parentTotals[p];
         let pSafe = 'p_' + p.replace(/[^a-zA-Z0-9]/g, '');
-        let pRow = { is_gt: 1, group: p, isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe, latestTotalFSNs: latestDate ? parentTotals[p][latestDate].shTotal : 0, latestDSLoss: latestDate ? (parentTotals[p][latestDate].dsTotal - parentTotals[p][latestDate].dsInstock) : 0 };
-        uniqueDates.forEach(d => { pRow[d+'_sh'] = calcPct(parentTotals[p][d].shInstock, parentTotals[p][d].shTotal); pRow[d+'_ds'] = calcPct(parentTotals[p][d].dsInstock, parentTotals[p][d].dsTotal); });
+        let pRow = { is_gt: 1, group: pObj.groupKey, isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe, latestTotalFSNs: latestDate ? pObj[latestDate].shTotal : 0, latestDSLoss: latestDate ? (pObj[latestDate].dsTotal - pObj[latestDate].dsInstock) : 0 };
+        uniqueDates.forEach(d => { pRow[d+'_sh'] = calcPct(pObj[d].shInstock, pObj[d].shTotal); pRow[d+'_ds'] = calcPct(pObj[d].dsInstock, pObj[d].dsTotal); });
         tableData.push(pRow);
 
         if (hasChildren) {
@@ -1041,8 +1047,6 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
   try {
     let isShLevel = (activeTabTarget === 'sh');
     let hasChildren = isShLevel || ($('#toggle-drilldown').is(':checked') && (activeTabTarget === 'vendor' || activeTabTarget === 'brand'));
-    
-    // Hardcode UI Override
     if (isShLevel) groupColName = 'Zone';
     
     const latestDate = GLOBAL_DATES.length > 0 ? GLOBAL_DATES[GLOBAL_DATES.length - 1] : null;
@@ -1068,19 +1072,32 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
 
     for (let i = 0; i < data.length; i++) {
       let row = data[i];
-      let baseGroupKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let rawBaseKey = (gColIdx !== undefined && row[gColIdx] ? row[gColIdx] : 'Unknown').toString().trim();
+      let upperBaseKey = rawBaseKey.toUpperCase();
       let reportDate = String(row[rDateIdx] || 'Unknown');
       
-      let pKey = baseGroupKey;
-      if (activeTabTarget === 'fsn' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
+      let pKeyRaw = rawBaseKey;
+      let pKey = upperBaseKey;
       
+      if (activeTabTarget === 'fsn' && titleIdx !== undefined) {
+          let title = String(row[titleIdx] || 'Unknown').trim();
+          pKeyRaw += ' - ' + title;
+          pKey += ' - ' + title.toUpperCase();
+      }
+
+      let cKeyRaw = null;
       let cKey = null;
+      
       if (hasChildren) {
           if (isShLevel) {
-              pKey = shZoneMap[baseGroupKey.toUpperCase()] || 'Unassigned';
-              cKey = baseGroupKey;
+              let rawZone = shZoneMap[upperBaseKey] || 'Unassigned';
+              pKeyRaw = rawZone.charAt(0).toUpperCase() + rawZone.slice(1).toLowerCase();
+              pKey = pKeyRaw.toUpperCase();
+              cKeyRaw = rawBaseKey;
+              cKey = upperBaseKey;
           } else {
-              cKey = shIdx !== undefined && row[shIdx] ? String(row[shIdx]).trim() : 'Unknown';
+              cKeyRaw = shIdx !== undefined && row[shIdx] ? String(row[shIdx]).trim() : 'Unknown';
+              cKey = cKeyRaw.toUpperCase();
           }
       }
 
@@ -1091,12 +1108,12 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
       if (bnFiltersRaw.length === 0) isAllowedSH = (buyNode === 'YES' || buyNode === 'Y' || buyNode === 'TRUE');
       else isAllowedSH = mappedBnFilters.includes(buyNode);
 
-      if (!parentTotals[pKey]) { parentTotals[pKey] = {}; uniqueDates.forEach(d => parentTotals[pKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = { groupKey: pKeyRaw }; uniqueDates.forEach(d => parentTotals[pKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
       
       let pcKey = null;
       if (hasChildren && cKey) {
           pcKey = pKey + '|||' + cKey;
-          if (!childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKey }; uniqueDates.forEach(d => childTotals[pcKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
+          if (!childTotals[pcKey]) { childTotals[pcKey] = { groupKey: cKeyRaw }; uniqueDates.forEach(d => childTotals[pcKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
       }
 
       if (isAllowedSH && uniqueDates.includes(reportDate)) {
@@ -1129,9 +1146,10 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     if(gtHasData) tableData.push(gtRow);
 
     Object.keys(parentTotals).sort().forEach(p => {
+        let pObj = parentTotals[p];
         let pSafe = 'p_' + p.replace(/[^a-zA-Z0-9]/g, '');
-        let pRow = { is_gt: 1, group: p, isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe, latestTotalFSNs: latestDate ? parentTotals[p][latestDate].shTotal : 0 };
-        uniqueDates.forEach(d => { pRow[d+'_atp'] = calcPct(parentTotals[p][d].atp, parentTotals[p][d].norm); pRow[d+'_sch'] = calcPct(parentTotals[p][d].sch, parentTotals[p][d].norm); pRow[d+'_po'] = calcPct(parentTotals[p][d].po, parentTotals[p][d].norm); });
+        let pRow = { is_gt: 1, group: pObj.groupKey, isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe, latestTotalFSNs: latestDate ? pObj[latestDate].shTotal : 0 };
+        uniqueDates.forEach(d => { pRow[d+'_atp'] = calcPct(pObj[d].atp, pObj[d].norm); pRow[d+'_sch'] = calcPct(pObj[d].sch, pObj[d].norm); pRow[d+'_po'] = calcPct(pObj[d].po, pObj[d].norm); });
         tableData.push(pRow);
 
         if (hasChildren) {
@@ -1199,17 +1217,21 @@ function exportRawCSV() {
     let titleIdx = findCol(colIdxP1, ['Title', 'Product_Title']);
 
     activeFilteredP1.forEach(row => {
-      let pKey = (row[colIdxP1[activeTabCol]] || 'Unknown').toString().trim();
-      if (activeTabName === 'FSN' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
+      let rawBaseKey = (row[colIdxP1[activeTabCol]] || 'Unknown').toString().trim();
+      let pKeyRaw = rawBaseKey;
+      let pKey = rawBaseKey.toUpperCase();
+
+      if (activeTabName === 'FSN' && titleIdx !== undefined) {
+          let title = String(row[titleIdx] || 'Unknown').trim();
+          pKeyRaw += ' - ' + title;
+          pKey += ' - ' + title.toUpperCase();
+      }
       
       const rawRemark = String(row[rIdx] || '').trim().toLowerCase();
       let remark = 'Other Loss';
-      
-      if (rawRemark.includes('asp')) {
-          remark = 'ASP Drop';
-      } else if (rawRemark.includes('network')) {
-          remark = 'Network Issue';
-      } else {
+      if (rawRemark.includes('asp')) remark = 'ASP Drop';
+      else if (rawRemark.includes('network')) remark = 'Network Issue';
+      else {
           for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
               if (k.toLowerCase() === rawRemark) { remark = k; break; } 
           }
@@ -1222,7 +1244,7 @@ function exportRawCSV() {
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'YES' || buyNode === 'Y' || buyNode === 'TRUE'); isAllowedDS = true; }
       else { let matches = mappedBnFilters.includes(buyNode); isAllowedSH = matches; isAllowedDS = matches; }
 
-      if (!parentTotals[pKey]) { parentTotals[pKey] = { total: 0, dsInstock: 0, dsTotal: 0 }; Object.keys(LOSS_REMARK_SEQ).forEach(k => parentTotals[pKey][k] = 0); }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = { groupKey: pKeyRaw, total: 0, dsInstock: 0, dsTotal: 0 }; Object.keys(LOSS_REMARK_SEQ).forEach(k => parentTotals[pKey][k] = 0); }
       if (isAllowedDS) { parentTotals[pKey].dsInstock += dsInstock; parentTotals[pKey].dsTotal += dsTotal; }
       if (isAllowedSH) { parentTotals[pKey].total += fsns; if (parentTotals[pKey][remark] !== undefined) parentTotals[pKey][remark] += fsns; }
     });
@@ -1231,9 +1253,9 @@ function exportRawCSV() {
     let headerArr = [activeTabName, "SH Total FSNs", "DS Instock %", "DS Instock Count", "DS Total Count"].concat(sortedRemarks);
     csvDataRows.push(headerArr.map(h => `"${h}"`).join(","));
 
-    Object.keys(parentTotals).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
+    Object.keys(parentTotals).sort((a,b) => parentTotals[a].groupKey.toLowerCase().localeCompare(parentTotals[b].groupKey.toLowerCase())).forEach(group => {
       let dsPct = calcPct(parentTotals[group].dsInstock, parentTotals[group].dsTotal).toFixed(1) + "%";
-      let rowArr = [`"${group.replace(/"/g, '""')}"`, parentTotals[group].total, dsPct, parentTotals[group].dsInstock, parentTotals[group].dsTotal];
+      let rowArr = [`"${parentTotals[group].groupKey.replace(/"/g, '""')}"`, parentTotals[group].total, dsPct, parentTotals[group].dsInstock, parentTotals[group].dsTotal];
       sortedRemarks.forEach(rem => rowArr.push(calcPct(parentTotals[group][rem], parentTotals[group].total).toFixed(1) + "%")); csvDataRows.push(rowArr.join(","));
     });
   } else if (currentPage === 'p2') {
@@ -1242,8 +1264,16 @@ function exportRawCSV() {
     let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']); let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
 
     activeFilteredP2.forEach(row => {
-      let pKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[findCol(colIdxP2, ['Report_Date'])] || 'Unknown');
-      if (activeTabName === 'FSN' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
+      let rawBaseKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim();
+      let pKeyRaw = rawBaseKey;
+      let pKey = rawBaseKey.toUpperCase();
+      let reportDate = String(row[findCol(colIdxP2, ['Report_Date'])] || 'Unknown');
+
+      if (activeTabName === 'FSN' && titleIdx !== undefined) {
+          let title = String(row[titleIdx] || 'Unknown').trim();
+          pKeyRaw += ' - ' + title;
+          pKey += ' - ' + title.toUpperCase();
+      }
 
       const remark = String(row[findCol(colIdxP2, ['Loss_Remark'])] || '').trim().toLowerCase(), buyNode = String(row[buyIdx] || '').trim().toUpperCase();
       const countFSN = Number(row[findCol(colIdxP2, ['FSN_Count'])]) || 0;
@@ -1255,7 +1285,7 @@ function exportRawCSV() {
       if (bnFiltersRaw.length === 0) { isAllowedSH = (buyNode === 'YES' || buyNode === 'Y' || buyNode === 'TRUE'); isAllowedDS = true; }
       else { let matches = mappedBnFilters.includes(buyNode); isAllowedSH = matches; isAllowedDS = matches; }
 
-      if (!parentTotals[pKey]) { parentTotals[pKey] = {}; uniqueDates.forEach(d => parentTotals[pKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = { groupKey: pKeyRaw }; uniqueDates.forEach(d => parentTotals[pKey][d] = { shInstock: 0, shTotal: 0, dsInstock: 0, dsTotal: 0 }); }
       if (isAllowedSH && uniqueDates.includes(reportDate)) { parentTotals[pKey][reportDate].shTotal += countFSN; if (remark === 'instock') parentTotals[pKey][reportDate].shInstock += countFSN; }
       if (isAllowedDS && uniqueDates.includes(reportDate)) { parentTotals[pKey][reportDate].dsTotal += countTotalDS; parentTotals[pKey][reportDate].dsInstock += countInstockDS; }
     });
@@ -1264,9 +1294,9 @@ function exportRawCSV() {
     uniqueDates.forEach(d => { headerArr.push(`SH Instock FSNs - ${d}`, `SH Total FSNs - ${d}`, `DS Instock - ${d}`, `DS Total - ${d}`); });
     csvDataRows.push(headerArr.map(h => `"${h}"`).join(","));
 
-    Object.keys(parentTotals).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
+    Object.keys(parentTotals).sort((a,b) => parentTotals[a].groupKey.toLowerCase().localeCompare(parentTotals[b].groupKey.toLowerCase())).forEach(group => {
       let latestDsLoss = latestDate ? (parentTotals[group][latestDate].dsTotal - parentTotals[group][latestDate].dsInstock) : 0;
-      let rowArr = [`"${group.replace(/"/g, '""')}"`, latestDsLoss];
+      let rowArr = [`"${parentTotals[group].groupKey.replace(/"/g, '""')}"`, latestDsLoss];
       uniqueDates.forEach(d => { rowArr.push(parentTotals[group][d].shInstock, parentTotals[group][d].shTotal, parentTotals[group][d].dsInstock, parentTotals[group][d].dsTotal); });
       csvDataRows.push(rowArr.join(","));
     });
@@ -1276,15 +1306,23 @@ function exportRawCSV() {
     let idxMstnAtp = findCol(colIdxP2, ['MSTN_atp']); let idxMstnSch = findCol(colIdxP2, ['MSTN_with_scheduling']); let idxMstnPo  = findCol(colIdxP2, ['MSTN_with_po']); let idxNorm = findCol(colIdxP2, ['new_norm']); let fsnIdx = findCol(colIdxP2, ['FSN_Count']);
 
     activeFilteredP2.forEach(row => {
-      let pKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim(), reportDate = String(row[findCol(colIdxP2, ['Report_Date'])] || 'Unknown');
-      if (activeTabName === 'FSN' && titleIdx !== undefined) pKey += ' - ' + (row[titleIdx] || 'Unknown');
+      let rawBaseKey = (row[colIdxP2[activeTabCol]] || 'Unknown').toString().trim();
+      let pKeyRaw = rawBaseKey;
+      let pKey = rawBaseKey.toUpperCase();
+      let reportDate = String(row[findCol(colIdxP2, ['Report_Date'])] || 'Unknown');
+
+      if (activeTabName === 'FSN' && titleIdx !== undefined) {
+          let title = String(row[titleIdx] || 'Unknown').trim();
+          pKeyRaw += ' - ' + title;
+          pKey += ' - ' + title.toUpperCase();
+      }
 
       const buyNode = String(row[buyIdx] || '').trim().toUpperCase();
       let isAllowedSH = false;
       if (bnFiltersRaw.length === 0) isAllowedSH = (buyNode === 'YES' || buyNode === 'Y' || buyNode === 'TRUE');
       else isAllowedSH = mappedBnFilters.includes(buyNode);
 
-      if (!parentTotals[pKey]) { parentTotals[pKey] = {}; uniqueDates.forEach(d => parentTotals[pKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
+      if (!parentTotals[pKey]) { parentTotals[pKey] = { groupKey: pKeyRaw }; uniqueDates.forEach(d => parentTotals[pKey][d] = { atp: 0, sch: 0, po: 0, norm: 0, shTotal: 0 }); }
       if (isAllowedSH && uniqueDates.includes(reportDate)) { parentTotals[pKey][reportDate].atp += (Number(row[idxMstnAtp]) || 0); parentTotals[pKey][reportDate].sch += (Number(row[idxMstnSch]) || 0); parentTotals[pKey][reportDate].po  += (Number(row[idxMstnPo]) || 0); parentTotals[pKey][reportDate].norm += (Number(row[idxNorm]) || 0); parentTotals[pKey][reportDate].shTotal += (Number(row[fsnIdx]) || 0); }
     });
 
@@ -1292,8 +1330,8 @@ function exportRawCSV() {
     uniqueDates.forEach(d => { headerArr.push(`${d} (ATP %)`, `${d} (+Sch %)`, `${d} (+PO %)`); });
     csvDataRows.push(headerArr.map(h => `"${h}"`).join(","));
 
-    Object.keys(parentTotals).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase())).forEach(group => {
-      let latestFSN = latestDate ? parentTotals[group][latestDate].shTotal : 0; let rowArr = [`"${group.replace(/"/g, '""')}"`, latestFSN];
+    Object.keys(parentTotals).sort((a,b) => parentTotals[a].groupKey.toLowerCase().localeCompare(parentTotals[b].groupKey.toLowerCase())).forEach(group => {
+      let latestFSN = latestDate ? parentTotals[group][latestDate].shTotal : 0; let rowArr = [`"${parentTotals[group].groupKey.replace(/"/g, '""')}"`, latestFSN];
       uniqueDates.forEach(d => { let dNorm = parentTotals[group][d].norm; rowArr.push(calcPct(parentTotals[group][d].atp, dNorm).toFixed(1) + "%"); rowArr.push(calcPct(parentTotals[group][d].sch, dNorm).toFixed(1) + "%"); rowArr.push(calcPct(parentTotals[group][d].po, dNorm).toFixed(1) + "%"); });
       csvDataRows.push(rowArr.join(","));
     });
