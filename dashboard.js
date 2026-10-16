@@ -400,15 +400,23 @@ function triggerFilterLogic() {
 }
 
 function aggregateAllDataInMemory() {
+  const getSet = (id) => new Set(($(id).val() || []).map(v => String(v).trim().toUpperCase()));
+  
   const filterSets = {
-    bu: new Set($('#filter-bu').val() || []), company: new Set($('#filter-company').val() || []), kam: new Set($('#filter-kam').val() || []),
-    kamLead: new Set($('#filter-kam-lead').val() || []), owner: new Set($('#filter-owner').val() || []), sh: new Set($('#filter-sh').val() || []),
-    brand: new Set($('#filter-brand').val() || []), vendor: new Set($('#filter-vendor').val() || []), vertical: new Set($('#filter-vertical').val() || []),
-    supercategory: new Set($('#filter-supercategory').val() || []),
-    tagging: new Set($('#filter-tagging').val() || []), vmi: new Set($('#filter-vmi').val() || []), brandPoc: new Set($('#filter-brand-poc').val() || []),
-    fsn: new Set($('#filter-fsn').val() || []), dsBucket: new Set($('#filter-ds-bucket').val() || []), zone: new Set($('#filter-zone').val() || []),
-    updatedBu: new Set($('#filter-updated-bu').val() || []), gourmet: new Set($('#filter-gourmet').val() || []), regional: new Set($('#filter-regional').val() || []),
-    organic: new Set($('#filter-organic').val() || []), em: new Set($('#filter-em').val() || []), ubpl: new Set($('#filter-ubpl').val() || [])
+    bu: getSet('#filter-bu'), company: getSet('#filter-company'), kam: getSet('#filter-kam'),
+    kamLead: getSet('#filter-kam-lead'), owner: getSet('#filter-owner'), sh: getSet('#filter-sh'),
+    brand: getSet('#filter-brand'), vendor: getSet('#filter-vendor'), vertical: getSet('#filter-vertical'),
+    supercategory: getSet('#filter-supercategory'), tagging: getSet('#filter-tagging'), vmi: getSet('#filter-vmi'), 
+    brandPoc: getSet('#filter-brand-poc'), fsn: getSet('#filter-fsn'), dsBucket: getSet('#filter-ds-bucket'), 
+    zone: getSet('#filter-zone'), updatedBu: getSet('#filter-updated-bu'), gourmet: getSet('#filter-gourmet'), 
+    regional: getSet('#filter-regional'), organic: getSet('#filter-organic'), em: getSet('#filter-em'), 
+    ubpl: getSet('#filter-ubpl'), buyingNode: getSet('#filter-buying-node')
+  };
+
+  const check = (idx, setObj, row) => {
+    if (setObj.size === 0 || idx === undefined) return true;
+    let v = String(row[idx] || '').trim().toUpperCase();
+    return setObj.has(v);
   };
 
   let idxBU1 = findCol(colIdxP1, ['BU']); let idxComp1 = findCol(colIdxP1, ['Company']); let idxKam1 = findCol(colIdxP1, ['KAM']); let idxLead1 = findCol(colIdxP1, ['KAM_Lead']); let idxOwner1 = findCol(colIdxP1, ['Instock_Owner']);
@@ -419,32 +427,20 @@ function aggregateAllDataInMemory() {
   let idxSuper1 = findCol(colIdxP1, ['Super_Category', 'supercategory']); let idxOrg1 = findCol(colIdxP1, ['Organic_Flag', 'organic']); let idxEm1 = findCol(colIdxP1, ['Engagement_Manager', 'engagementmanager']); let idxUbpl1 = findCol(colIdxP1, ['UB_PL_Flag', 'ubpl', 'ub_pl']);
 
   activeFilteredP1 = rawDataP1.filter(row => {
-    let buyNode = idxBuyNode1 !== undefined ? String(row[idxBuyNode1] || '').trim().toLowerCase() : 'yes';
-    let mappedBnFilters = ($('#filter-buying-node').val() || []).map(v => String(v).toLowerCase().trim());
-    if (mappedBnFilters.length > 0 && !mappedBnFilters.includes(buyNode)) return false;
-    if (filterSets.dsBucket.size > 0 && idxDsBucket1 !== undefined && !filterSets.dsBucket.has(String(row[idxDsBucket1]).trim())) return false;
-    if (filterSets.zone.size > 0 && idxZone1 !== undefined && !filterSets.zone.has(String(row[idxZone1]).trim())) return false;
-    if (filterSets.updatedBu.size > 0 && idxUpdatedBu1 !== undefined && !filterSets.updatedBu.has(String(row[idxUpdatedBu1]).trim())) return false;
-    if (filterSets.gourmet.size > 0 && idxGourmet1 !== undefined && !filterSets.gourmet.has(String(row[idxGourmet1]).trim())) return false;
-    if (filterSets.regional.size > 0 && idxRegional1 !== undefined && !filterSets.regional.has(String(row[idxRegional1]).trim())) return false;
-    if (filterSets.organic.size > 0 && idxOrg1 !== undefined && !filterSets.organic.has(String(row[idxOrg1]).trim())) return false;
-    if (filterSets.em.size > 0 && idxEm1 !== undefined && !filterSets.em.has(String(row[idxEm1]).trim())) return false;
-    if (filterSets.ubpl.size > 0 && idxUbpl1 !== undefined && !filterSets.ubpl.has(String(row[idxUbpl1]).trim())) return false;
-    
-    if (filterSets.bu.size > 0 && idxBU1 !== undefined && !filterSets.bu.has(String(row[idxBU1]).trim())) return false;
-    if (filterSets.company.size > 0 && idxComp1 !== undefined && !filterSets.company.has(String(row[idxComp1]).trim())) return false;
-    if (filterSets.kam.size > 0 && idxKam1 !== undefined && !filterSets.kam.has(String(row[idxKam1]).trim())) return false;
-    if (filterSets.kamLead.size > 0 && idxLead1 !== undefined && !filterSets.kamLead.has(String(row[idxLead1]).trim())) return false;
-    if (filterSets.owner.size > 0 && idxOwner1 !== undefined && !filterSets.owner.has(String(row[idxOwner1]).trim())) return false;
-    if (filterSets.sh.size > 0 && idxSH1 !== undefined && !filterSets.sh.has(String(row[idxSH1]).trim())) return false;
-    if (filterSets.brand.size > 0 && idxBrand1 !== undefined && !filterSets.brand.has(String(row[idxBrand1]).trim())) return false;
-    if (filterSets.vendor.size > 0 && idxVendor1 !== undefined && !filterSets.vendor.has(String(row[idxVendor1]).trim())) return false;
-    if (filterSets.vertical.size > 0 && idxVert1 !== undefined && !filterSets.vertical.has(String(row[idxVert1]).trim())) return false;
-    if (filterSets.supercategory.size > 0 && idxSuper1 !== undefined && !filterSets.supercategory.has(String(row[idxSuper1]).trim())) return false;
-    if (filterSets.tagging.size > 0 && idxTag1 !== undefined && !filterSets.tagging.has(String(row[idxTag1]).trim())) return false;
-    if (filterSets.vmi.size > 0 && idxVmi1 !== undefined && !filterSets.vmi.has(String(row[idxVmi1]).trim())) return false;
-    if (filterSets.brandPoc.size > 0 && idxBrandPoc1 !== undefined && !filterSets.brandPoc.has(String(row[idxBrandPoc1]).trim())) return false;
-    if (filterSets.fsn.size > 0 && idxFsn1 !== undefined && !filterSets.fsn.has(String(row[idxFsn1]).trim())) return false;
+    let buyNode = idxBuyNode1 !== undefined ? String(row[idxBuyNode1] || '').trim().toUpperCase() : 'YES';
+    if (filterSets.buyingNode.size > 0 && !filterSets.buyingNode.has(buyNode)) return false;
+
+    if (!check(idxBU1, filterSets.bu, row)) return false; if (!check(idxComp1, filterSets.company, row)) return false;
+    if (!check(idxKam1, filterSets.kam, row)) return false; if (!check(idxLead1, filterSets.kamLead, row)) return false;
+    if (!check(idxOwner1, filterSets.owner, row)) return false; if (!check(idxSH1, filterSets.sh, row)) return false;
+    if (!check(idxBrand1, filterSets.brand, row)) return false; if (!check(idxVendor1, filterSets.vendor, row)) return false;
+    if (!check(idxVert1, filterSets.vertical, row)) return false; if (!check(idxSuper1, filterSets.supercategory, row)) return false;
+    if (!check(idxTag1, filterSets.tagging, row)) return false; if (!check(idxVmi1, filterSets.vmi, row)) return false;
+    if (!check(idxBrandPoc1, filterSets.brandPoc, row)) return false; if (!check(idxFsn1, filterSets.fsn, row)) return false;
+    if (!check(idxDsBucket1, filterSets.dsBucket, row)) return false; if (!check(idxZone1, filterSets.zone, row)) return false;
+    if (!check(idxUpdatedBu1, filterSets.updatedBu, row)) return false; if (!check(idxGourmet1, filterSets.gourmet, row)) return false;
+    if (!check(idxRegional1, filterSets.regional, row)) return false; if (!check(idxOrg1, filterSets.organic, row)) return false;
+    if (!check(idxEm1, filterSets.em, row)) return false; if (!check(idxUbpl1, filterSets.ubpl, row)) return false;
     return true;
   });
 
@@ -456,32 +452,20 @@ function aggregateAllDataInMemory() {
   let idxSuper2 = findCol(colIdxP2, ['Super_Category', 'supercategory']), idxOrg2 = findCol(colIdxP2, ['Organic_Flag', 'organic']), idxEm2 = findCol(colIdxP2, ['Engagement_Manager', 'engagementmanager']), idxUbpl2 = findCol(colIdxP2, ['UB_PL_Flag', 'ubpl', 'ub_pl']);
 
   activeFilteredP2 = rawDataP2.filter(row => {
-    let buyNode = idxBuyNode2 !== undefined ? String(row[idxBuyNode2] || '').trim().toLowerCase() : 'yes';
-    let mappedBnFilters = ($('#filter-buying-node').val() || []).map(v => String(v).toLowerCase().trim());
-    if (mappedBnFilters.length > 0 && !mappedBnFilters.includes(buyNode)) return false;
-    if (filterSets.dsBucket.size > 0 && idxDsBucket2 !== undefined && !filterSets.dsBucket.has(String(row[idxDsBucket2]).trim())) return false;
-    if (filterSets.zone.size > 0 && idxZone2 !== undefined && !filterSets.zone.has(String(row[idxZone2]).trim())) return false;
-    if (filterSets.updatedBu.size > 0 && idxUpdatedBu2 !== undefined && !filterSets.updatedBu.has(String(row[idxUpdatedBu2]).trim())) return false;
-    if (filterSets.gourmet.size > 0 && idxGourmet2 !== undefined && !filterSets.gourmet.has(String(row[idxGourmet2]).trim())) return false;
-    if (filterSets.regional.size > 0 && idxRegional2 !== undefined && !filterSets.regional.has(String(row[idxRegional2]).trim())) return false;
-    if (filterSets.organic.size > 0 && idxOrg2 !== undefined && !filterSets.organic.has(String(row[idxOrg2]).trim())) return false;
-    if (filterSets.em.size > 0 && idxEm2 !== undefined && !filterSets.em.has(String(row[idxEm2]).trim())) return false;
-    if (filterSets.ubpl.size > 0 && idxUbpl2 !== undefined && !filterSets.ubpl.has(String(row[idxUbpl2]).trim())) return false;
+    let buyNode = idxBuyNode2 !== undefined ? String(row[idxBuyNode2] || '').trim().toUpperCase() : 'YES';
+    if (filterSets.buyingNode.size > 0 && !filterSets.buyingNode.has(buyNode)) return false;
 
-    if (filterSets.bu.size > 0 && idxBU2 !== undefined && !filterSets.bu.has(String(row[idxBU2]).trim())) return false;
-    if (filterSets.company.size > 0 && idxComp2 !== undefined && !filterSets.company.has(String(row[idxComp2]).trim())) return false;
-    if (filterSets.kam.size > 0 && idxKam2 !== undefined && !filterSets.kam.has(String(row[idxKam2]).trim())) return false;
-    if (filterSets.kamLead.size > 0 && idxLead2 !== undefined && !filterSets.kamLead.has(String(row[idxLead2]).trim())) return false;
-    if (filterSets.owner.size > 0 && idxOwner2 !== undefined && !filterSets.owner.has(String(row[idxOwner2]).trim())) return false;
-    if (filterSets.sh.size > 0 && idxSH2 !== undefined && !filterSets.sh.has(String(row[idxSH2]).trim())) return false;
-    if (filterSets.brand.size > 0 && idxBrand2 !== undefined && !filterSets.brand.has(String(row[idxBrand2]).trim())) return false;
-    if (filterSets.vendor.size > 0 && idxVendor2 !== undefined && !filterSets.vendor.has(String(row[idxVendor2]).trim())) return false;
-    if (filterSets.vertical.size > 0 && idxVert2 !== undefined && !filterSets.vertical.has(String(row[idxVert2]).trim())) return false;
-    if (filterSets.supercategory.size > 0 && idxSuper2 !== undefined && !filterSets.supercategory.has(String(row[idxSuper2]).trim())) return false;
-    if (filterSets.tagging.size > 0 && idxTag2 !== undefined && !filterSets.tagging.has(String(row[idxTag2]).trim())) return false;
-    if (filterSets.vmi.size > 0 && idxVmi2 !== undefined && !filterSets.vmi.has(String(row[idxVmi2]).trim())) return false;
-    if (filterSets.brandPoc.size > 0 && idxBrandPoc2 !== undefined && !filterSets.brandPoc.has(String(row[idxBrandPoc2]).trim())) return false;
-    if (filterSets.fsn.size > 0 && idxFsn2 !== undefined && !filterSets.fsn.has(String(row[idxFsn2]).trim())) return false;
+    if (!check(idxBU2, filterSets.bu, row)) return false; if (!check(idxComp2, filterSets.company, row)) return false;
+    if (!check(idxKam2, filterSets.kam, row)) return false; if (!check(idxLead2, filterSets.kamLead, row)) return false;
+    if (!check(idxOwner2, filterSets.owner, row)) return false; if (!check(idxSH2, filterSets.sh, row)) return false;
+    if (!check(idxBrand2, filterSets.brand, row)) return false; if (!check(idxVendor2, filterSets.vendor, row)) return false;
+    if (!check(idxVert2, filterSets.vertical, row)) return false; if (!check(idxSuper2, filterSets.supercategory, row)) return false;
+    if (!check(idxTag2, filterSets.tagging, row)) return false; if (!check(idxVmi2, filterSets.vmi, row)) return false;
+    if (!check(idxBrandPoc2, filterSets.brandPoc, row)) return false; if (!check(idxFsn2, filterSets.fsn, row)) return false;
+    if (!check(idxDsBucket2, filterSets.dsBucket, row)) return false; if (!check(idxZone2, filterSets.zone, row)) return false;
+    if (!check(idxUpdatedBu2, filterSets.updatedBu, row)) return false; if (!check(idxGourmet2, filterSets.gourmet, row)) return false;
+    if (!check(idxRegional2, filterSets.regional, row)) return false; if (!check(idxOrg2, filterSets.organic, row)) return false;
+    if (!check(idxEm2, filterSets.em, row)) return false; if (!check(idxUbpl2, filterSets.ubpl, row)) return false;
     return true;
   });
 }
@@ -529,6 +513,20 @@ function renderVisibleTable() {
   }, 250);
 }
 
+const normalizeTag = (tag) => {
+    if(!tag) return 'Unknown';
+    let t = String(tag).toUpperCase().replace(/\s+/g, '');
+    if (t.includes('TOP100')) return 'Top 100';
+    if (t.includes('101-500')) return 'Top 101-500';
+    if (t.includes('CORE')) return 'Core List';
+    if (t.includes('NEXT2500') || t.includes('NEXT2.5K')) return 'Next 2500';
+    if (t.includes('7500') || t.includes('7.5K')) return 'Top 7500';
+    if (t.includes('10K') || t.includes('10000')) return 'Top 10K';
+    if (t.includes('12.5K') || t.includes('12500')) return 'Top 12.5K';
+    if (t.includes('REST')) return 'Rest';
+    return String(tag).charAt(0).toUpperCase() + String(tag).slice(1).toLowerCase();
+};
+
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
@@ -551,13 +549,12 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
 
     for (let i = 0; i < data.length; i++) {
         let row = data[i];
-        const groupKey = (idxTag !== undefined && row[idxTag] ? row[idxTag] : 'Unknown').toString().trim();
+        const groupKey = normalizeTag(idxTag !== undefined ? row[idxTag] : 'Unknown');
         const zoneName = (idxZone !== undefined && row[idxZone] ? row[idxZone] : 'Unassigned').toString().trim();
         const shName = (idxSH !== undefined && row[idxSH] ? row[idxSH] : 'Unknown').toString().trim();
 
-        if (taggingFiltersRaw.length === 0) {
-            let tagNorm = groupKey.toLowerCase().replace(/\s+/g, '');
-            if (tagNorm.includes('rest')) continue; 
+        if (taggingFiltersRaw.length === 0 && groupKey.toLowerCase() === 'rest') {
+            continue; 
         }
 
         const buyNode = bnIdx !== undefined ? String(row[bnIdx] || '').trim().toUpperCase() : 'YES';
@@ -613,7 +610,7 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       let gNorm = groupName.toLowerCase().replace(/\s+/g, '');
       if (gNorm.includes('top100')) return 1; if (gNorm.includes('101-500')) return 2; if (gNorm.includes('core')) return 3;
       if (gNorm.includes('next2500') || gNorm.includes('next2.5k')) return 4; if (gNorm.includes('7500') || gNorm.includes('7.5k')) return 5;
-      if (gNorm.includes('10k') || gNorm.includes('10000')) return 6; if (gNorm.includes('rest')) return 7;
+      if (gNorm.includes('10k') || gNorm.includes('10000')) return 6; if (gNorm.includes('12.5k') || gNorm.includes('12500')) return 7; if (gNorm.includes('rest')) return 8;
       return 99;
     };
 
@@ -890,6 +887,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     let gColIdx = findCol(colIdxP2, [groupCol]);
     let rDateIdx = findCol(colIdxP2, ['Report_Date']), remIdx = findCol(colIdxP2, ['Loss_Remark']);
     let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']), fsnIdx = findCol(colIdxP2, ['FSN_Count']), tdIdx = findCol(colIdxP2, ['Total_DS_Count']), idiIdx = findCol(colIdxP2, ['Instock_DS_Count']);
+    let zIdx = findCol(colIdxP2, ['Zone']);
     let shIdx = findCol(colIdxP2, ['FC_Code']);
     let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
 
@@ -916,9 +914,17 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
       
       if (hasChildren) {
           if (isShLevel) {
-              let rawZone = shZoneMap[upperBaseKey] || 'Unassigned';
+              let rawZone = 'Unassigned';
+              if (zIdx !== undefined && row[zIdx]) {
+                  rawZone = String(row[zIdx]).trim();
+              } else if (shZoneMap[upperBaseKey]) {
+                  rawZone = shZoneMap[upperBaseKey];
+              }
+              if (!rawZone || rawZone === '-') rawZone = 'Unassigned';
+              
               pKeyRaw = rawZone.charAt(0).toUpperCase() + rawZone.slice(1).toLowerCase();
               pKey = pKeyRaw.toUpperCase();
+              
               cKeyRaw = rawBaseKey;
               cKey = upperBaseKey;
           } else {
@@ -1059,6 +1065,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     let rDateIdx = findCol(colIdxP2, ['Report_Date']);
     let buyIdx = findCol(colIdxP2, ['Buying_Node_Flag']);
     let fsnIdx = findCol(colIdxP2, ['FSN_Count']);
+    let zIdx = findCol(colIdxP2, ['Zone']);
     let shIdx = findCol(colIdxP2, ['FC_Code']);
     let titleIdx = findCol(colIdxP2, ['Title', 'Product_Title']);
     
@@ -1090,9 +1097,17 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
       
       if (hasChildren) {
           if (isShLevel) {
-              let rawZone = shZoneMap[upperBaseKey] || 'Unassigned';
+              let rawZone = 'Unassigned';
+              if (zIdx !== undefined && row[zIdx]) {
+                  rawZone = String(row[zIdx]).trim();
+              } else if (shZoneMap[upperBaseKey]) {
+                  rawZone = shZoneMap[upperBaseKey];
+              }
+              if (!rawZone || rawZone === '-') rawZone = 'Unassigned';
+              
               pKeyRaw = rawZone.charAt(0).toUpperCase() + rawZone.slice(1).toLowerCase();
               pKey = pKeyRaw.toUpperCase();
+              
               cKeyRaw = rawBaseKey;
               cKey = upperBaseKey;
           } else {
@@ -1229,9 +1244,12 @@ function exportRawCSV() {
       
       const rawRemark = String(row[rIdx] || '').trim().toLowerCase();
       let remark = 'Other Loss';
-      if (rawRemark.includes('asp')) remark = 'ASP Drop';
-      else if (rawRemark.includes('network')) remark = 'Network Issue';
-      else {
+      
+      if (rawRemark.includes('asp')) {
+          remark = 'ASP Drop';
+      } else if (rawRemark.includes('network')) {
+          remark = 'Network Issue';
+      } else {
           for (let k of Object.keys(LOSS_REMARK_SEQ)) { 
               if (k.toLowerCase() === rawRemark) { remark = k; break; } 
           }
@@ -1359,6 +1377,8 @@ function populateFilterOptions() {
         let v = String(row[idx] || '').trim();
         if (v && v !== '-') {
           let upper = v.toUpperCase();
+          if(upper === 'UB') v = 'UB';
+          if(upper === 'PL') v = 'PL';
           if (!mapObj.has(upper)) mapObj.set(upper, v);
         }
       });
