@@ -681,7 +681,7 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
 
     const formatRow = (r, sOrd, grp, isGT, isGrpHdr, isCh, zSafe) => {
         let rowObj = {
-            is_gt: isGT ? 1 : 0, // 1 sends Grand Total to the bottom when orderFixed is 'asc'
+            is_gt: isGT ? 0 : 1, // 0 locks Grand Total at the TOP when orderFixed is 'asc'
             sort_order: sOrd, group: grp, isGrandTotal: isGT, isGroupHeader: isGrpHdr, isChild: isCh, zoneSafe: zSafe,
             fsn: r.fsn, atp: r.atp, qoh: r.qoh, openPo: r.openPo, fdrr: r.fdrr, sdrr: r.sdrr, iwit: r.iwit, irn: r.irn,
             dsNormRaw: r.dsNormRaw,
@@ -776,7 +776,7 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       }
     };
     
-    // Automatically locate indices and apply orderFixed to permanently lock the Grand Total at the bottom
+    // Locks the GT at the absolute top by setting orderFixed to target the 'is_gt' column ascending
     let gtColIdx = columns.findIndex(c => c.data === 'is_gt');
     let sortColIdx = columns.findIndex(c => c.data === 'sort_order');
     dtConfig.orderFixed = [gtColIdx, 'asc'];
@@ -906,7 +906,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
 
     const tableData = [];
     if (grandTotalFsns > 0 || grandTotalDSTotal > 0) {
-      let gtRow = { is_gt: 1, group: 'GRAND TOTAL', total: grandTotalFsns, dsInstockPct: calcPct(grandTotalDSInstock, grandTotalDSTotal), isGrandTotal: true };
+      let gtRow = { is_gt: 0, group: 'GRAND TOTAL', total: grandTotalFsns, dsInstockPct: calcPct(grandTotalDSInstock, grandTotalDSTotal), isGrandTotal: true };
       Object.keys(LOSS_REMARK_SEQ).forEach(rem => { gtRow[rem] = calcPct(grandTotalRemarks[rem], grandTotalFsns); }); 
       tableData.push(gtRow);
     }
@@ -914,7 +914,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
     Object.keys(parentTotals).sort().forEach(p => {
         let pObj = parentTotals[p];
         let pSafe = 'p_' + p.replace(/[^a-zA-Z0-9]/g, '');
-        let pRow = { is_gt: 0, group: pObj.groupKey, total: pObj.totalFsns, dsInstockPct: calcPct(pObj.dsInstock, pObj.dsTotal), isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe };
+        let pRow = { is_gt: 1, group: pObj.groupKey, total: pObj.totalFsns, dsInstockPct: calcPct(pObj.dsInstock, pObj.dsTotal), isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe };
         Object.keys(LOSS_REMARK_SEQ).forEach(rem => pRow[rem] = calcPct(pObj.remarks[rem], pObj.totalFsns)); 
         tableData.push(pRow);
 
@@ -923,7 +923,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
             Object.keys(childTotals).forEach(pcKey => {
                 if (pcKey.startsWith(p + '|||')) {
                     let cObj = childTotals[pcKey];
-                    let cRow = { is_gt: 0, group: cObj.groupKey, total: cObj.totalFsns, dsInstockPct: calcPct(cObj.dsInstock, cObj.dsTotal), isGrandTotal: false, isChild: true, zoneSafe: pSafe };
+                    let cRow = { is_gt: 1, group: cObj.groupKey, total: cObj.totalFsns, dsInstockPct: calcPct(cObj.dsInstock, cObj.dsTotal), isGrandTotal: false, isChild: true, zoneSafe: pSafe };
                     Object.keys(LOSS_REMARK_SEQ).forEach(rem => cRow[rem] = calcPct(cObj.remarks[rem], cObj.totalFsns));
                     childrenRows.push(cRow);
                 }
@@ -1062,7 +1062,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     }
 
     const tableData = [];
-    let gtRow = { is_gt: 1, group: 'GRAND TOTAL', isGrandTotal: true };
+    let gtRow = { is_gt: 0, group: 'GRAND TOTAL', isGrandTotal: true };
     let gtHasData = false;
     gtRow['latestTotalFSNs'] = latestDate ? grandTotalByDate[latestDate].shTotal : 0;
     gtRow['latestDSLoss'] = latestDate ? (grandTotalByDate[latestDate].dsTotal - grandTotalByDate[latestDate].dsInstock) : 0;
@@ -1077,7 +1077,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
     Object.keys(parentTotals).sort().forEach(p => {
         let pObj = parentTotals[p];
         let pSafe = 'p_' + p.replace(/[^a-zA-Z0-9]/g, '');
-        let pRow = { is_gt: 0, group: pObj.groupKey, isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe, latestTotalFSNs: latestDate ? pObj[latestDate].shTotal : 0, latestDSLoss: latestDate ? (pObj[latestDate].dsTotal - pObj[latestDate].dsInstock) : 0 };
+        let pRow = { is_gt: 1, group: pObj.groupKey, isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe, latestTotalFSNs: latestDate ? pObj[latestDate].shTotal : 0, latestDSLoss: latestDate ? (pObj[latestDate].dsTotal - pObj[latestDate].dsInstock) : 0 };
         uniqueDates.forEach(d => { pRow[d+'_sh'] = calcPct(pObj[d].shInstock, pObj[d].shTotal); pRow[d+'_ds'] = calcPct(pObj[d].dsInstock, pObj[d].dsTotal); });
         tableData.push(pRow);
 
@@ -1086,7 +1086,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
             Object.keys(childTotals).forEach(pcKey => {
                 if (pcKey.startsWith(p + '|||')) {
                     let cObj = childTotals[pcKey];
-                    let cRow = { is_gt: 0, group: cObj.groupKey, isGrandTotal: false, isChild: true, zoneSafe: pSafe, latestTotalFSNs: latestDate ? cObj[latestDate].shTotal : 0, latestDSLoss: latestDate ? (cObj[latestDate].dsTotal - cObj[latestDate].dsInstock) : 0 };
+                    let cRow = { is_gt: 1, group: cObj.groupKey, isGrandTotal: false, isChild: true, zoneSafe: pSafe, latestTotalFSNs: latestDate ? cObj[latestDate].shTotal : 0, latestDSLoss: latestDate ? (cObj[latestDate].dsTotal - cObj[latestDate].dsInstock) : 0 };
                     uniqueDates.forEach(d => { cRow[d+'_sh'] = calcPct(cObj[d].shInstock, cObj[d].shTotal); cRow[d+'_ds'] = calcPct(cObj[d].dsInstock, cObj[d].dsTotal); });
                     childrenRows.push(cRow);
                 }
@@ -1233,7 +1233,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     }
 
     const tableData = [];
-    let gtRow = { is_gt: 1, group: 'GRAND TOTAL', isGrandTotal: true };
+    let gtRow = { is_gt: 0, group: 'GRAND TOTAL', isGrandTotal: true };
     let gtHasData = false;
 
     gtRow['latestTotalFSNs'] = latestDate ? grandTotalByDate[latestDate].shTotal : 0;
@@ -1249,7 +1249,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
     Object.keys(parentTotals).sort().forEach(p => {
         let pObj = parentTotals[p];
         let pSafe = 'p_' + p.replace(/[^a-zA-Z0-9]/g, '');
-        let pRow = { is_gt: 0, group: pObj.groupKey, isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe, latestTotalFSNs: latestDate ? pObj[latestDate].shTotal : 0 };
+        let pRow = { is_gt: 1, group: pObj.groupKey, isGrandTotal: false, isGroupHeader: hasChildren, zoneSafe: pSafe, latestTotalFSNs: latestDate ? pObj[latestDate].shTotal : 0 };
         uniqueDates.forEach(d => { pRow[d+'_atp'] = calcPct(pObj[d].atp, pObj[d].norm); pRow[d+'_sch'] = calcPct(pObj[d].sch, pObj[d].norm); pRow[d+'_po'] = calcPct(pObj[d].po, pObj[d].norm); });
         tableData.push(pRow);
 
@@ -1258,7 +1258,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
             Object.keys(childTotals).forEach(pcKey => {
                 if (pcKey.startsWith(p + '|||')) {
                     let cObj = childTotals[pcKey];
-                    let cRow = { is_gt: 0, group: cObj.groupKey, isGrandTotal: false, isChild: true, zoneSafe: pSafe, latestTotalFSNs: latestDate ? cObj[latestDate].shTotal : 0 };
+                    let cRow = { is_gt: 1, group: cObj.groupKey, isGrandTotal: false, isChild: true, zoneSafe: pSafe, latestTotalFSNs: latestDate ? cObj[latestDate].shTotal : 0 };
                     uniqueDates.forEach(d => { cRow[d+'_atp'] = calcPct(cObj[d].atp, cObj[d].norm); cRow[d+'_sch'] = calcPct(cObj[d].sch, cObj[d].norm); cRow[d+'_po'] = calcPct(cObj[d].po, cObj[d].norm); });
                     childrenRows.push(cRow);
                 }
