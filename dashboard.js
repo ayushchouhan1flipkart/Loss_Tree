@@ -218,13 +218,35 @@ function fetchCSV(fileId, token) {
 
 function initDashboardFromClient(d1, d2) {
   try {
-    if (!d1 || d1.length === 0) d1 = [["Error"]];
-    if (!d2 || d2.length === 0) d2 = [["Error"]];
+    // DIAGNOSTIC SAFETY NET
+    if (!d1 || d1.length < 2) { 
+        alert("CRITICAL ERROR: Loss_Remarks_Rows.csv is empty or corrupted."); 
+        $('#loader-overlay').hide(); return; 
+    }
+    if (!d2 || d2.length < 2) { 
+        alert("CRITICAL ERROR: DoD_Instock_OOS file is empty or corrupted."); 
+        $('#loader-overlay').hide(); return; 
+    }
+    if (String(d1[0][0]).includes('"error"') || String(d1[0][0]).includes('Unauthorized')) {
+        alert("GOOGLE DRIVE ERROR: Access Denied. Your login session may have expired, or third-party cookies are blocked in Chrome.");
+        $('#loader-overlay').hide(); return;
+    }
+
     let headers1 = d1.shift(); 
     let headers2 = d2.shift();
     
-    colIdxP1 = Object.fromEntries(headers1.map((h, i) => [h, i])); 
-    colIdxP2 = Object.fromEntries(headers2.map((h, i) => [h, i])); 
+    colIdxP1 = Object.fromEntries(headers1.map((h, i) => [String(h).trim(), i])); 
+    colIdxP2 = Object.fromEntries(headers2.map((h, i) => [String(h).trim(), i])); 
+
+    // Header Validation
+    let missing = [];
+    if (findCol(colIdxP1, ['FC_Code']) === undefined) missing.push("FC_Code (Loss File)");
+    if (findCol(colIdxP1, ['Vendor_Name']) === undefined) missing.push("Vendor_Name (Loss File)");
+    if (findCol(colIdxP2, ['Report_Date']) === undefined) missing.push("Report_Date (DoD File)");
+
+    if (missing.length > 0) {
+        alert("DATA CORRUPTION DETECTED: The following required columns are missing from your Google Drive files:\n\n" + missing.join("\n") + "\n\nPlease ensure your files are valid CSVs and headers haven't been renamed.");
+    }
     
     rawDataP1 = d1;
 
@@ -530,7 +552,7 @@ const normalizeTag = (tag) => {
 function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
   try {
     const byGroup = {}; const byZoneTag = {}; const zoneTotals = {}; const shTotals = {}; const byShTag = {};
-    const initBucket = () => ({ fsn: 0, atp: 0, qoh: 0, openPo: 0, fdrr: 0, sdrr: 0, dsInstock: 0, dsTotal: 0, shInstock: 0, shSch: 0, shPo: 0, mstnAtp: 0, mstnSch: 0, mstnPo: 0, norm: 0, iwit: 0, irn: 0, dsMstn: 0, dsMstnIt: 0, dsNorm: 0, instockItDs: 0, dsNormRaw: 0 });
+    const initBucket = () => ({ fsn: 0, atp: 0, qoh: 0, openPo: 0, fdrr: 0, sdrr: 0, dsInstock: 0, dsTotal: 0, shInstock: 0, shSch: 0, shPo: 0, mstnAtp: 0, mstnSch: 0, mstnPo: 0, norm: 0, iwit: 0, irn: 0, dsMstn: 0, dsMstnIt: 0, dsNorm: 0, instockItDs: 0, dsNormRaw: 0, instockShAtpDs: 0 });
     let gt = initBucket();
 
     let idxTag = findCol(colIdxP1, ['tagging']); let idxZone = findCol(colIdxP1, ['Zone']); let idxSH = findCol(colIdxP1, ['FC_Code']);
@@ -542,6 +564,7 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
     let bnIdx = findCol(colIdxP1, ['Buying_Node_Flag']); let idxIwit = findCol(colIdxP1, ['SH_DS_IWIT_T_minus_1']); let idxIrn = findCol(colIdxP1, ['IRN_T_minus_2']);
     let idxDsMstn = findCol(colIdxP1, ['DS_MSTN']); let idxDsMstnIt = findCol(colIdxP1, ['DS_MSTN_IT']); let idxDsNorm = findCol(colIdxP1, ['DS_Norm']);
     let idxInstockItDs = findCol(colIdxP1, ['Instock_IT_DS_Count']);
+    let idxInstockShAtpDs = findCol(colIdxP1, ['Instock_SH_ATP_DS_Count']);
 
     let bnFiltersRaw = $('#filter-buying-node').val() || [];
     let mappedBnFilters = bnFiltersRaw.map(v => String(v).toUpperCase().trim());
@@ -576,6 +599,7 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
         if (vDsIn > vDsTot) vDsTot = vDsIn; 
 
         let vDsMstn = Number(row[idxDsMstn]) || 0, vDsMstnIt = Number(row[idxDsMstnIt]) || 0, vDsNorm = Number(row[idxDsNorm]) || 0, vInstockItDs = Number(row[idxInstockItDs]) || 0;
+        let vInstockShAtpDs = idxInstockShAtpDs !== undefined ? (Number(row[idxInstockShAtpDs]) || 0) : 0;
         
         let vAtp = Number(row[idxAtp]) || 0, vQoh = Number(row[idxQoh]) || 0, vOpenPo = Number(row[idxOpenPo]) || 0;
         let vFdrr = Number(row[idxFdrr]) || 0, vSdrr = Number(row[idxSdrr]) || 0;
@@ -596,6 +620,7 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
            let b = targets[j];
            if (isAllowedDS) {
                b.dsInstock += vDsIn; b.dsTotal += vDsTot; b.dsMstn += vDsMstn; b.dsMstnIt += vDsMstnIt; b.dsNorm += vDsNorm; b.instockItDs += vInstockItDs; b.dsNormRaw += vDsNorm;
+               b.instockShAtpDs += vInstockShAtpDs;
            }
            if (isAllowedSH) {
                b.fsn += vFsn; b.atp += vAtp; b.qoh += vQoh; b.openPo += vOpenPo; b.fdrr += vFdrr; b.sdrr += vSdrr;
@@ -614,15 +639,21 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       return 99;
     };
 
-    const formatRow = (r, sOrd, grp, isGT, isGrpHdr, isCh, zSafe) => ({
-        is_gt: isGT ? 0 : 1, sort_order: sOrd, group: grp, isGrandTotal: isGT, isGroupHeader: isGrpHdr, isChild: isCh, zoneSafe: zSafe,
-        fsn: r.fsn, atp: r.atp, qoh: r.qoh, openPo: r.openPo, fdrr: r.fdrr, sdrr: r.sdrr, iwit: r.iwit, irn: r.irn,
-        dsNormRaw: r.dsNormRaw,
-        dsPct: calcPct(r.dsInstock, r.dsTotal), dsInstockItPct: calcPct(r.instockItDs, r.dsTotal),
-        shPct: calcPct(r.shInstock, r.fsn), shSchPct: calcPct(r.shSch, r.fsn), shPoPct: calcPct(r.shPo, r.fsn),
-        dsMstnPct: calcPct(r.dsMstn, r.dsNorm), dsMstnItPct: calcPct(r.dsMstnIt, r.dsNorm),
-        mstnAtpPct: calcPct(r.mstnAtp, r.norm), mstnSchPct: calcPct(r.mstnSch, r.norm), mstnPoPct: calcPct(r.mstnPo, r.norm)
-    });
+    const formatRow = (r, sOrd, grp, isGT, isGrpHdr, isCh, zSafe) => {
+        let rowObj = {
+            is_gt: isGT ? 0 : 1, sort_order: sOrd, group: grp, isGrandTotal: isGT, isGroupHeader: isGrpHdr, isChild: isCh, zoneSafe: zSafe,
+            fsn: r.fsn, atp: r.atp, qoh: r.qoh, openPo: r.openPo, fdrr: r.fdrr, sdrr: r.sdrr, iwit: r.iwit, irn: r.irn,
+            dsNormRaw: r.dsNormRaw,
+            dsPct: calcPct(r.dsInstock, r.dsTotal), dsInstockItPct: calcPct(r.instockItDs, r.dsTotal),
+            shPct: calcPct(r.shInstock, r.fsn), shSchPct: calcPct(r.shSch, r.fsn), shPoPct: calcPct(r.shPo, r.fsn),
+            dsMstnPct: calcPct(r.dsMstn, r.dsNorm), dsMstnItPct: calcPct(r.dsMstnIt, r.dsNorm),
+            mstnAtpPct: calcPct(r.mstnAtp, r.norm), mstnSchPct: calcPct(r.mstnSch, r.norm), mstnPoPct: calcPct(r.mstnPo, r.norm)
+        };
+        if (idxInstockShAtpDs !== undefined) {
+             rowObj.dsInstockShAtpPct = calcPct(r.instockShAtpDs, r.dsTotal);
+        }
+        return rowObj;
+    };
 
     const t1Data = [];
     if (gt.fsn > 0 || gt.dsTotal > 0) t1Data.push(formatRow(gt, 0, 'GRAND TOTAL', true, false, false, ''));
@@ -664,7 +695,15 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       { title: "SDRR (7D)", data: 'sdrr', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
       { title: "DS Norm", data: 'dsNormRaw', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
       { title: "DS Instock %", data: 'dsPct', type: 'num', className: 'section-divider', render: function(d,t){ return t==='display'? d.toFixed(1)+'%' : d; }, createdCell: applyColorCoding },
-      { title: "DS Instock+IT %", data: 'dsInstockItPct', type: 'num', render: function(d,t){ return t==='display'? d.toFixed(1)+'%' : d; }, createdCell: applyColorCoding },
+      { title: "DS Instock+IT %", data: 'dsInstockItPct', type: 'num', render: function(d,t){ return t==='display'? d.toFixed(1)+'%' : d; }, createdCell: applyColorCoding }
+    ];
+
+    let idxInstockShAtpDs = findCol(colIdxP1, ['Instock_SH_ATP_DS_Count']);
+    if (idxInstockShAtpDs !== undefined) {
+         columns.push({ title: "DS Instock+SH_ATP %", data: 'dsInstockShAtpPct', type: 'num', render: function(d,t){ return t==='display'? d.toFixed(1)+'%' : d; }, createdCell: applyColorCoding });
+    }
+
+    columns = columns.concat([
       { title: "SH Instock %", data: 'shPct', type: 'num', render: function(d,t){ return t==='display'? d.toFixed(1)+'%' : d; }, createdCell: applyColorCoding },
       { title: "SH (+Sch) %", data: 'shSchPct', type: 'num', render: function(d,t){ return t==='display'? d.toFixed(1)+'%' : d; }, createdCell: applyColorCoding },
       { title: "SH (+PO) %", data: 'shPoPct', type: 'num', render: function(d,t){ return t==='display'? d.toFixed(1)+'%' : d; }, createdCell: applyColorCoding },
@@ -677,12 +716,14 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
       { title: "IRN (T-2)", data: 'irn', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
       { title: "GT", data: 'is_gt', visible: false, searchable: false },
       { title: "Sort", data: 'sort_order', visible: false, searchable: false }
-    ];
+    ]);
 
     const dtConfig = {
       columns: columns, deferRender: true, destroy: true, scrollX: true, scrollY: '50vh', scrollCollapse: true, 
       fixedColumns: { left: 1 }, dom: SAFE_DOM, searchBuilder: { logic: 'AND' }, autoWidth: false, 
-      order: [[20, 'asc'], [21, 'asc']], paging: false, 
+      // Ensure 'is_gt' (column index corresponding to 'GT') is the primary sorting column to pin it.
+      // 20 is 'GT', 21 is 'Sort' before dynamic column injection. Let's find the actual indices.
+      order: [], paging: false, 
       createdRow: function (row, data) { 
           if (data.isGrandTotal) $(row).addClass('total-row'); 
           else if (data.isGroupHeader) { $(row).addClass('group-header collapsed'); $(row).attr('data-zone', data.zoneSafe); }
@@ -696,6 +737,14 @@ function buildSummaryTables(tableIdMain, tableIdZone, tableIdSH, data) {
           });
       }
     };
+    
+    // Find exact indices for sorting based on the dynamically built columns array
+    let gtColIdx = columns.findIndex(c => c.data === 'is_gt');
+    let sortColIdx = columns.findIndex(c => c.data === 'sort_order');
+    dtConfig.order = [[gtColIdx, 'asc'], [sortColIdx, 'asc']];
+    // Update orderData for the first column
+    columns[0].orderData = [gtColIdx, sortColIdx];
+
 
     $('#' + tableIdMain).DataTable({ ...dtConfig, data: t1Data });
     $('#' + tableIdZone).DataTable({ ...dtConfig, data: t2Data }); 
@@ -847,7 +896,7 @@ function buildTableP1(tableId, data, groupCol, groupColName) {
         }
     });
 
-    let columns = [ { data: 'is_gt', visible: false, searchable: false }, { title: groupColName, data: 'group', render: renderGroupCol }, { title: "SH Total FSNs", data: 'total', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }, { title: "DS Instock %", data: 'dsInstockPct', type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: applyColorCoding } ];
+    let columns = [ { data: 'is_gt', visible: false, searchable: false }, { title: groupColName, data: 'group', render: renderGroupCol, orderData: [0, 1] }, { title: "SH Total FSNs", data: 'total', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }, { title: "DS Instock %", data: 'dsInstockPct', type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: applyColorCoding } ];
     const sortedRemarks = Object.keys(LOSS_REMARK_SEQ).sort((a,b) => LOSS_REMARK_SEQ[a] - LOSS_REMARK_SEQ[b]);
     
     sortedRemarks.forEach(remark => { columns.push({ title: remark === 'Instock' ? 'SH Instock %' : remark, data: remark, type: 'num', render: function(d, t) { return t === 'display' ? d.toFixed(1) + '%' : d; }, createdCell: function (td, cellData, rowData) { if (remark === 'Instock') applyColorCoding(td, cellData, rowData); else if (!rowData.isGrandTotal && cellData > 15) { td.style.color = '#b91c1c'; td.style.fontWeight = '700'; } } }); });
@@ -1012,7 +1061,7 @@ function buildTableP2(tableId, data, groupCol, groupColName) {
 
     let columns = [
       { data: 'is_gt', visible: false, searchable: false },
-      { title: groupColName, data: 'group', render: renderGroupCol },
+      { title: groupColName, data: 'group', render: renderGroupCol, orderData: [0, 1] },
       { title: "Total FSNs (Latest SH)", data: 'latestTotalFSNs', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) },
       { title: "Latest DS Loss", data: 'latestDSLoss', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }
     ];
@@ -1184,7 +1233,7 @@ function buildTableP3(tableId, data, groupCol, groupColName) {
 
     let columns = [
       { data: 'is_gt', visible: false, searchable: false },
-      { title: groupColName, data: 'group', render: renderGroupCol },
+      { title: groupColName, data: 'group', render: renderGroupCol, orderData: [0, 1] },
       { title: "Total FSNs (Latest SH)", data: 'latestTotalFSNs', type: 'num', render: $.fn.dataTable.render.number(',', '.', 0) }
     ];
     
